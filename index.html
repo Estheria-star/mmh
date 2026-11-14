@@ -65,7 +65,7 @@ body{
 }
 .grain{
   position:fixed; inset:0;
-  z-index:90;
+  z-index:96;
   pointer-events:none;
   opacity:.04;
   background-image:
@@ -83,6 +83,8 @@ body{
 }
 
 main{ position:relative; z-index:3; }
+
+body.locked{ overflow:hidden; height:100vh; }
 
 /* ---------- 通用幕 ---------- */
 
@@ -123,11 +125,11 @@ main{ position:relative; z-index:3; }
   width:100%;
   height:100%;
   touch-action:pan-y;
-  cursor:grab;
+  cursor:var(--cur-flower) 14 14, grab;
   -webkit-user-select:none;
   user-select:none;
 }
-#orb.dragging{ cursor:grabbing; }
+#orb.dragging{ cursor:var(--cur-grip) 13 13, grabbing; }
 
 .orbWord{
   position:relative;
@@ -146,20 +148,24 @@ main{ position:relative; z-index:3; }
   z-index:-1;
 }
 
-.orbWord span{
+.orbWord span,.orbWord h1,.orbWord p{
   display:block;
   position:absolute;
   left:50%;
   top:52%;
   width:100vw;
-  transform:translate(-50%,-50%);
-  transition:opacity .9s ease, letter-spacing 1.4s cubic-bezier(.19,.9,.24,1);
+  transform:translate(-50%,-50%) scale(var(--ws,1));
+  transition:opacity .9s ease, letter-spacing 1.4s cubic-bezier(.19,.9,.24,1), transform .45s cubic-bezier(.19,.9,.24,1);
 }
+
+/* 拖动时让文字稍微退后，把主角让给球 */
+.sticky.is-dragging{ --ws:.93; }
 
 /* 球心：她的名字 */
 .word-her{
   font-size:clamp(2.1rem, 7.2vw, 4.6rem);
   font-weight:600;
+  margin:0;
   letter-spacing:.3em;
   text-indent:.3em;
   color:#FFF7EC;
@@ -167,14 +173,14 @@ main{ position:relative; z-index:3; }
     0 0 26px rgba(255,247,236,.72),
     0 0 64px rgba(228,99,58,.68),
     0 0 140px rgba(206,66,41,.5);
-  opacity:1;
+  opacity:var(--her-a,1);
 }
-.stage.late .word-her{ opacity:0; }
 
 /* 花心：这句话 */
 .word-love{
   font-size:clamp(1.9rem, 6.4vw, 4.2rem);
   font-weight:600;
+  margin:0;
   letter-spacing:.16em;
   text-indent:.16em;
   color:#FFF7EC;
@@ -182,9 +188,8 @@ main{ position:relative; z-index:3; }
     0 0 26px rgba(255,247,236,.72),
     0 0 64px rgba(228,99,58,.7),
     0 0 140px rgba(206,66,41,.52);
-  opacity:0;
+  opacity:var(--love-a,0);
 }
-.stage.late .word-love{ opacity:1; }
 
 .stageHint{
   position:absolute;
@@ -208,10 +213,156 @@ main{ position:relative; z-index:3; }
   animation:cue 2.8s cubic-bezier(.6,0,.3,1) infinite;
   transform-origin:top center;
 }
-.stage.late .stageHint{ opacity:0; }
+.stageHint{ opacity:calc(1 - var(--love-a,0)); }
 @keyframes cue{
   0%,100%{ transform:scaleY(.3); opacity:.25; }
   50%    { transform:scaleY(1);  opacity:.9;  }
+}
+
+/* ============================================================
+   第二幕 · 收束
+   ============================================================ */
+
+.act--bridge{
+  align-items:center;
+  text-align:center;
+  min-height:88svh;
+}
+
+.bridge-line{
+  margin:0;
+  max-width:22em;
+  font-size:clamp(1.05rem, 2.4vw, 1.6rem);
+  letter-spacing:.22em;
+  line-height:2.5;
+  color:rgba(241,231,216,.92);
+}
+
+.bridge-line span{
+  display:inline-block;
+  opacity:var(--k,0);
+  transform:translateY(calc((1 - var(--k,0)) * 14px));
+  filter:blur(calc((1 - var(--k,0)) * 2px));
+  transition:opacity .55s ease, transform .55s cubic-bezier(.19,.9,.24,1), filter .55s ease;
+}
+.bridge-line span.br{ width:100%; height:0; }
+.bridge-line span.dot{ color:var(--ember); }
+
+/* ============================================================
+   入口
+   ============================================================ */
+
+.cover{
+  position:fixed;
+  inset:0;
+  z-index:95;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:
+    radial-gradient(54% 48% at 50% 46%, rgba(206,66,41,.145), transparent 66%),
+    radial-gradient(82% 82% at 50% 50%, rgba(12,8,16,0), rgba(4,2,6,.95) 100%),
+    #07050A;
+  transition:opacity 1.2s ease, visibility 1.2s;
+}
+.cover.gone{ opacity:0; visibility:hidden; pointer-events:none; }
+
+.cover-inner{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:clamp(1rem, 3vh, 1.75rem);
+  opacity:0;
+  animation:coverIn 2.2s cubic-bezier(.19,.9,.24,1) .35s forwards;
+}
+@keyframes coverIn{ to{ opacity:1; } }
+
+.cover-flower{
+  width:clamp(52px, 6.6vw, 76px);
+  height:auto;
+  animation:coverBreath 6.5s ease-in-out infinite;
+  filter:drop-shadow(0 0 28px rgba(206,66,41,.42));
+}
+@keyframes coverBreath{
+  0%,100%{ transform:scale(1) rotate(-2.5deg); opacity:.86; }
+  50%    { transform:scale(1.07) rotate(2.5deg); opacity:1; }
+}
+
+.enter-btn{
+  font-family:var(--serif);
+  font-size:clamp(.72rem, 1.1vw, .82rem);
+  letter-spacing:.46em;
+  text-indent:.46em;
+  color:rgba(241,231,216,.62);
+  background:none;
+  border:0;
+  padding:.7em .9em;
+  transition:color .6s ease, letter-spacing .9s cubic-bezier(.19,.9,.24,1), opacity .6s ease;
+}
+.enter-btn:hover,
+.enter-btn:focus-visible{
+  color:#FFF3E6;
+  letter-spacing:.6em;
+  text-indent:.6em;
+  outline:none;
+}
+.cover-flower{ transition:transform .8s cubic-bezier(.19,.9,.24,1); }
+.cover:hover .cover-flower{ transform:scale(1.06) rotate(0deg); }
+
+/* ============================================================
+   背景音乐开关
+   ============================================================ */
+
+.bgm-btn{
+  position:fixed;
+  right:clamp(1rem, 2.6vw, 1.9rem);
+  bottom:clamp(1rem, 2.6vh, 1.9rem);
+  width:38px; height:38px;
+  padding:0;
+  display:grid; place-items:center;
+  z-index:94;
+  background:rgba(10,6,14,.55);
+  border:1px solid rgba(201,162,107,.22);
+  border-radius:50%;
+  color:rgba(241,231,216,.6);
+  opacity:.6;
+  transition:opacity .45s ease, border-color .45s ease, color .45s ease, transform .45s cubic-bezier(.19,.9,.24,1);
+}
+.bgm-btn svg{ width:18px; height:18px; }
+/* 还没响过的时候轻轻呼吸一下，提示这里有声音 */
+.bgm-btn.hint{ animation:bgmHint 3.8s ease-in-out infinite; }
+@keyframes bgmHint{
+  0%,100%{ opacity:.42; border-color:rgba(201,162,107,.16); }
+  50%    { opacity:.95; border-color:rgba(201,162,107,.55); }
+}
+.bgm-btn.hint:hover{ animation:none; opacity:1; }
+.bgm-btn:hover{ opacity:1; border-color:rgba(201,162,107,.5); color:rgba(241,231,216,.95); }
+.bgm-btn.on{
+  opacity:.9;
+  color:#F2764D;
+  border-color:rgba(228,99,58,.5);
+}
+.bgm-btn.on svg{ animation:notePulse 3.4s ease-in-out infinite; }
+@keyframes notePulse{
+  0%,100%{ transform:scale(1);   opacity:.85; }
+  50%    { transform:scale(1.09); opacity:1;  }
+}
+
+/* ============================================================
+   指针：一朵木棉
+   ============================================================ */
+
+:root{
+  /* 张开的花 */
+  --cur-flower:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cg fill='%23D8442C' stroke='%23FFC49A' stroke-width='.75'%3E%3Cellipse cx='14' cy='7.4' rx='4.8' ry='6.6'/%3E%3Cellipse cx='14' cy='7.4' rx='4.8' ry='6.6' transform='rotate(72 14 14)'/%3E%3Cellipse cx='14' cy='7.4' rx='4.8' ry='6.6' transform='rotate(144 14 14)'/%3E%3Cellipse cx='14' cy='7.4' rx='4.8' ry='6.6' transform='rotate(216 14 14)'/%3E%3Cellipse cx='14' cy='7.4' rx='4.8' ry='6.6' transform='rotate(288 14 14)'/%3E%3C/g%3E%3Ccircle cx='14' cy='14' r='2.6' fill='%23F6D5A6' stroke='%238A1B0E' stroke-width='.6'/%3E%3C/svg%3E");
+  /* 被捏住时花瓣收一收 */
+  --cur-grip:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cg fill='%23E85B33' stroke='%23FFD9B8' stroke-width='.75'%3E%3Cellipse cx='13' cy='7.6' rx='4.1' ry='5.7'/%3E%3Cellipse cx='13' cy='7.6' rx='4.1' ry='5.7' transform='rotate(72 13 13)'/%3E%3Cellipse cx='13' cy='7.6' rx='4.1' ry='5.7' transform='rotate(144 13 13)'/%3E%3Cellipse cx='13' cy='7.6' rx='4.1' ry='5.7' transform='rotate(216 13 13)'/%3E%3Cellipse cx='13' cy='7.6' rx='4.1' ry='5.7' transform='rotate(288 13 13)'/%3E%3C/g%3E%3Ccircle cx='13' cy='13' r='3.1' fill='%23F6D5A6' stroke='%238A1B0E' stroke-width='.6'/%3E%3C/svg%3E");
+}
+
+/* 触摸设备没有指针，别为它算这套；真浏览器不支持 SVG 光标时自动退回系统箭头 */
+@media (hover:hover) and (pointer:fine){
+  html{ cursor:var(--cur-flower) 14 14, auto; }
+  button, a, summary{ cursor:var(--cur-flower) 14 14, pointer; }
 }
 
 /* ============================================================
@@ -255,13 +406,16 @@ main{ position:relative; z-index:3; }
   flex-direction:column;
   justify-content:flex-end;
   padding-block:clamp(.32rem, .85vh, .58rem);
-  opacity:0;
-  transform:translateY(14px);
-  transition:opacity 1.1s ease, transform 1.1s cubic-bezier(.19,.9,.24,1);
-  transition-delay:calc(var(--i) * 30ms);
-  cursor:default;
+  /* --k 由滚动位置连续驱动，0 → 1 */
+  opacity:calc(var(--o,1) * var(--k,0));
+  transform:translateY(calc((1 - var(--k,0)) * 14px));
+  transition:opacity .45s ease, transform .45s cubic-bezier(.19,.9,.24,1);
+  border-radius:2px;
 }
-.act--voices.in .voice{ opacity:var(--o); transform:none; }
+/* 指尖划过字面，泛起一道窄窄的暖光 */
+.voice:hover{
+  background:linear-gradient(90deg, transparent, rgba(206,66,41,.075) 22%, rgba(206,66,41,.075) 78%, transparent);
+}
 
 .voice .txt{
   font-family:var(--latin);
@@ -295,7 +449,7 @@ main{ position:relative; z-index:3; }
   border-top:1px solid rgba(201,162,107,.14);
   border-bottom:1px solid rgba(201,162,107,.14);
   margin-bottom:clamp(1rem, 3vh, 2rem);
-  opacity:1;
+  opacity:var(--k,0);
 }
 .voice--major .txt{
   font-family:var(--serif);
@@ -335,7 +489,7 @@ main{ position:relative; z-index:3; }
   transform:scale(.9) rotate(-6deg);
   transition:opacity 1.8s ease .1s, transform 1.8s cubic-bezier(.19,.9,.24,1) .1s;
 }
-.act--end.in .sign .seal{ opacity:.95; transform:scale(1) rotate(0deg); }
+.act--end.in .sign .seal{ opacity:.95; transform:scale(1) rotate(0deg); animation:sealBreathe 7s ease-in-out 1.2s infinite; }
 
 .sign .herName{
   font-size:clamp(1.5rem, 4vw, 2.5rem);
@@ -376,6 +530,7 @@ main{ position:relative; z-index:3; }
 .act--end.in .sign p:nth-of-type(2){ transition-delay:.8s; }
 
 .bloomBtn{
+  position:relative;
   display:inline-block;
   margin-top:clamp(1.4rem, 3.6vh, 2.2rem);
   padding:.85em 2.1em;
@@ -387,7 +542,6 @@ main{ position:relative; z-index:3; }
   background:transparent;
   border:1px solid rgba(201,162,107,.3);
   border-radius:0;
-  cursor:pointer;
   transition:color .5s ease, border-color .5s ease, box-shadow .6s ease, background-color .5s ease;
 }
 .bloomBtn:hover,
@@ -397,6 +551,48 @@ main{ position:relative; z-index:3; }
   background:rgba(206,66,41,.1);
   box-shadow:0 0 34px rgba(206,66,41,.28), inset 0 0 22px rgba(206,66,41,.14);
   outline:none;
+}
+.bloomBtn:disabled{
+  cursor:default;
+  color:rgba(201,162,107,.5);
+  border-color:rgba(201,162,107,.16);
+}
+
+.bloomBtn::after{
+  content:"";
+  position:absolute;
+  inset:-1px;
+  border:1px solid rgba(228,99,58,.65);
+  border-radius:inherit;
+  opacity:0;
+  transform:scale(1);
+  pointer-events:none;
+}
+.bloomBtn.pulse::after{
+  animation:ripple .95s cubic-bezier(.19,.9,.24,1) forwards;
+}
+.burst-flower{
+  position:fixed; left:50%; top:50%;
+  width:min(48vmin, 340px); height:auto;
+  z-index:95; pointer-events:none;
+  transform:translate(-50%,-50%) scale(.2);
+  opacity:0;
+  animation:burst 1.5s cubic-bezier(.19,.9,.24,1) forwards;
+}
+@keyframes burst{
+  0%  { opacity:0; transform:translate(-50%,-50%) scale(.2) rotate(-14deg); }
+  28% { opacity:1; }
+  100%{ opacity:0; transform:translate(-50%,-50%) scale(1.3) rotate(0deg); }
+}
+@keyframes ripple{
+  from{ opacity:.85; transform:scale(1); }
+  to  { opacity:0;   transform:scale(1.55); }
+}
+
+/* 印章：落定之后还在很慢地呼吸 */
+@keyframes sealBreathe{
+  0%,100%{ filter:drop-shadow(0 0 0 rgba(228,99,58,0)); }
+  50%    { filter:drop-shadow(0 0 24px rgba(228,99,58,.38)); }
 }
 
 .colophon{
@@ -438,7 +634,7 @@ a:focus-visible, button:focus-visible{
 </style>
 </head>
 
-<body>
+<body class="locked">
 
 <div class="atmos" aria-hidden="true"></div>
 <canvas id="petals" aria-hidden="true"></canvas>
@@ -448,13 +644,21 @@ a:focus-visible, button:focus-visible{
   <!-- ══════════ 一 · 星球 → 花 ══════════ -->
   <section class="stage" id="stage">
     <div class="sticky">
-      <canvas id="orb" aria-hidden="true"></canvas>
+      <canvas id="orb" tabindex="0" role="img" aria-label="一颗由四十二种语言的「我爱你」组成的星球，可以用方向键或手指左右旋转"></canvas>
       <div class="orbWord">
-        <span class="word-her">米文慧</span>
-        <span class="word-love">我喜欢你</span>
+        <h1 class="word-her">米文慧</h1>
+        <p class="word-love">我喜欢你</p>
       </div>
       <div class="stageHint" aria-hidden="true">拖动球，或向下</div>
     </div>
+  </section>
+
+
+  <!-- ══════════ 二 · 收束 ══════════ -->
+  <section class="act act--bridge" id="bridge">
+    <p class="bridge-line" id="bridgeLine">
+      <span>每</span><span>一</span><span>种</span><span>说</span><span>法</span><span class="br"></span><span>都</span><span>是</span><span>在</span><span>说</span><span>你</span><span class="dot">。</span>
+    </p>
   </section>
 
 
@@ -558,6 +762,34 @@ a:focus-visible, button:focus-visible{
 
 </main>
 
+<!-- ══════════ 入口 ══════════ -->
+<div class="cover" id="cover">
+  <div class="cover-inner">
+    <svg class="cover-flower" viewBox="0 0 100 100" aria-hidden="true">
+      <g fill="#CE4229" stroke="#FFC49A" stroke-width=".7">
+        <ellipse cx="50" cy="26" rx="14.5" ry="20.5"/>
+        <ellipse cx="50" cy="26" rx="14.5" ry="20.5" transform="rotate(72 50 50)"/>
+        <ellipse cx="50" cy="26" rx="14.5" ry="20.5" transform="rotate(144 50 50)"/>
+        <ellipse cx="50" cy="26" rx="14.5" ry="20.5" transform="rotate(216 50 50)"/>
+        <ellipse cx="50" cy="26" rx="14.5" ry="20.5" transform="rotate(288 50 50)"/>
+      </g>
+      <circle cx="50" cy="50" r="7" fill="#F6D5A6" stroke="#8A1B0E" stroke-width=".8"/>
+    </svg>
+    <button class="enter-btn" id="enterBtn" type="button">点 击 进 入</button>
+  </div>
+</div>
+<noscript><style>.cover{display:none}body{overflow:auto !important}</style></noscript>
+
+<button class="bgm-btn" id="bgmBtn" type="button" aria-label="背景音乐" aria-pressed="false">
+  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M9.4 18.2V5.6l9.2-1.9v11.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="6.7" cy="18.2" r="2.7" fill="currentColor"/>
+    <circle cx="15.9" cy="15.6" r="2.7" fill="currentColor"/>
+  </svg>
+</button>
+
+<audio id="bgm" src="bgm.m4a" loop preload="auto"></audio>
+
 <div class="grain" aria-hidden="true"></div>
 <script>
 (function(){
@@ -565,54 +797,58 @@ a:focus-visible, button:focus-visible{
 
   var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var W = 0, H = 0, DPR = 1;
+  var entered = false;          // 点过「进入」之后才开跑
 
   /* ══════════════════════════════════════════
      0. 语料
      ══════════════════════════════════════════ */
 
+  var voiceEls = [];
+
+  // lang = 中文显示名，code = BCP-47（给屏幕阅读器正音用）
   var VOICES = [
-    { lang: "中文",            text: "我喜欢你",              major: true },
-    { lang: "日本語",          text: "愛してる" },
-    { lang: "English",         text: "I love you" },
-    { lang: "한국어",          text: "사랑해요" },
-    { lang: "Français",        text: "Je t’aime" },
-    { lang: "Deutsch",         text: "Ich liebe dich" },
-    { lang: "Español",         text: "Te quiero" },
-    { lang: "Italiano",        text: "Ti amo" },
-    { lang: "Português",       text: "Eu te amo" },
-    { lang: "Русский",         text: "Я тебя люблю" },
-    { lang: "العربية",         text: "أحبك" },
-    { lang: "עברית",           text: "אני אוהב אותך" },
-    { lang: "Ελληνικά",        text: "Σ’ αγαπώ" },
-    { lang: "Nederlands",      text: "Ik hou van je" },
-    { lang: "Svenska",         text: "Jag älskar dig" },
-    { lang: "Norsk",           text: "Jeg elsker deg" },
-    { lang: "Dansk",           text: "Jeg elsker dig" },
-    { lang: "Suomi",           text: "Minä rakastan sinua" },
-    { lang: "Polski",          text: "Kocham cię" },
-    { lang: "Čeština",         text: "Miluji tě" },
-    { lang: "Magyar",          text: "Szeretlek" },
-    { lang: "Türkçe",          text: "Seni seviyorum" },
-    { lang: "हिन्दी",            text: "मैं तुमसे प्यार करता हूँ" },
-    { lang: "ไทย",             text: "ฉันรักคุณ" },
-    { lang: "Tiếng Việt",      text: "Anh yêu em" },
-    { lang: "Bahasa Indonesia",text: "Aku cinta kamu" },
-    { lang: "Bahasa Melayu",   text: "Saya cinta awak" },
-    { lang: "Filipino",        text: "Mahal kita" },
-    { lang: "Kiswahili",       text: "Nakupenda" },
-    { lang: "Latina",          text: "Te amo" },
-    { lang: "Íslenska",        text: "Ég elska þig" },
-    { lang: "Українська",      text: "Я тебе кохаю" },
-    { lang: "فارسی",           text: "دوستت دارم" },
-    { lang: "Монгол",          text: "Би чамд хайртай" },
-    { lang: "བོད་སྐད",           text: "ང་ཁྱེད་ལ་དགའ་པོ་ཡོད" },
-    { lang: "Esperanto",       text: "Mi amas vin" },
-    { lang: "Hawaiʻi",         text: "Aloha au iā ʻoe" },
-    { lang: "Cymraeg",         text: "Rwy’n dy garu di" },
-    { lang: "Gaeilge",         text: "Is breá liom tú" },
-    { lang: "বাংলা",           text: "আমি তোমাকে ভালোবাসি" },
-    { lang: "ქართული",         text: "მე შენ მიყვარხარ" },
-    { lang: "አማርኛ",            text: "እኔ አንተን እወድሃለሁ" }
+    { lang: "中文",             code: "zh-CN", text: "我喜欢你",              major: true },
+    { lang: "日本語",           code: "ja",    text: "愛してる" },
+    { lang: "English",          code: "en",    text: "I love you" },
+    { lang: "한국어",           code: "ko",    text: "사랑해요" },
+    { lang: "Français",         code: "fr",    text: "Je t’aime" },
+    { lang: "Deutsch",          code: "de",    text: "Ich liebe dich" },
+    { lang: "Español",          code: "es",    text: "Te quiero" },
+    { lang: "Italiano",         code: "it",    text: "Ti amo" },
+    { lang: "Português",        code: "pt",    text: "Eu te amo" },
+    { lang: "Русский",          code: "ru",    text: "Я тебя люблю" },
+    { lang: "العربية",          code: "ar",    text: "أحبك" },
+    { lang: "עברית",            code: "he",    text: "אני אוהב אותך" },
+    { lang: "Ελληνικά",         code: "el",    text: "Σ’ αγαπώ" },
+    { lang: "Nederlands",       code: "nl",    text: "Ik hou van je" },
+    { lang: "Svenska",          code: "sv",    text: "Jag älskar dig" },
+    { lang: "Norsk",            code: "nb",    text: "Jeg elsker deg" },
+    { lang: "Dansk",            code: "da",    text: "Jeg elsker dig" },
+    { lang: "Suomi",            code: "fi",    text: "Minä rakastan sinua" },
+    { lang: "Polski",           code: "pl",    text: "Kocham cię" },
+    { lang: "Čeština",          code: "cs",    text: "Miluji tě" },
+    { lang: "Magyar",           code: "hu",    text: "Szeretlek" },
+    { lang: "Türkçe",           code: "tr",    text: "Seni seviyorum" },
+    { lang: "हिन्दी",             code: "hi",    text: "मैं तुमसे प्यार करता हूँ" },
+    { lang: "ไทย",              code: "th",    text: "ฉันรักคุณ" },
+    { lang: "Tiếng Việt",       code: "vi",    text: "Anh yêu em" },
+    { lang: "Bahasa Indonesia", code: "id",    text: "Aku cinta kamu" },
+    { lang: "Bahasa Melayu",    code: "ms",    text: "Saya cinta awak" },
+    { lang: "Filipino",         code: "fil",   text: "Mahal kita" },
+    { lang: "Kiswahili",        code: "sw",    text: "Nakupenda" },
+    { lang: "Latina",           code: "la",    text: "Te amo" },
+    { lang: "Íslenska",         code: "is",    text: "Ég elska þig" },
+    { lang: "Українська",       code: "uk",    text: "Я тебе кохаю" },
+    { lang: "فارسی",            code: "fa",    text: "دوستت دارم" },
+    { lang: "Монгол",           code: "mn",    text: "Би чамд хайртай" },
+    { lang: "བོད་སྐད",            code: "bo",    text: "ང་ཁྱེད་ལ་དགའ་པོ་ཡོད" },
+    { lang: "Esperanto",        code: "eo",    text: "Mi amas vin" },
+    { lang: "Hawaiʻi",          code: "haw",   text: "Aloha au iā ʻoe" },
+    { lang: "Cymraeg",          code: "cy",    text: "Rwy’n dy garu di" },
+    { lang: "Gaeilge",          code: "ga",    text: "Is breá liom tú" },
+    { lang: "বাংলা",            code: "bn",    text: "আমি তোমাকে ভালোবাসি" },
+    { lang: "ქართული",          code: "ka",    text: "მე შენ მიყვარხარ" },
+    { lang: "አማርኛ",             code: "am",    text: "እኔ አንተን እወድሃለሁ" }
   ];
 
   // 球面上飞来飞去的单字/短词
@@ -646,7 +882,9 @@ a:focus-visible, button:focus-visible{
   var wall = document.getElementById("wall");
   var seed = 20261113;
   function rnd(){
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    // 必须用 Math.imul：seed * 1103515245 会到 2^61 量级，
+    // float64 只有 53 位精度，直接相乘再 & 拿到的是垃圾低位。
+    seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff;
     return seed / 0x7fffffff;
   }
 
@@ -660,7 +898,10 @@ a:focus-visible, button:focus-visible{
       el.style.paddingLeft = (rnd() * 2.6).toFixed(2) + "rem";
       if (rnd() > 0.62) el.style.alignSelf = "end";
     }
-    el.innerHTML = '<span class="lang">' + v.lang + '</span><span class="txt">' + v.text + '</span>';
+    el.innerHTML =
+      '<span class="lang" lang="zh-CN">' + v.lang + '</span>' +
+      '<span class="txt" lang="' + v.code + '" dir="auto">' + v.text + '</span>';
+    voiceEls.push(el);
     wall.appendChild(el);
   });
 
@@ -749,6 +990,7 @@ a:focus-visible, button:focus-visible{
       sway: 0.4 + Math.random() * 1.5,
       phase: Math.random() * Math.PI * 2,
       hi: hi,
+      z: 0.25 + Math.random() * 0.75,          // 景深：小的更远
       a: big ? 0.18 + Math.random() * 0.16 : 0.42 + Math.random() * 0.4
     };
   }
@@ -763,13 +1005,20 @@ a:focus-visible, button:focus-visible{
     var al = p.a * petalAlpha;
     if (al <= 0.004) return;
 
-    var s = p.s * SPRITE_SCALE;
+    // 假的 3D：近处的转得实、亮；远处的淡、小、扁
+    var depth = 0.62 + p.z * 0.62;
+    var s = p.s * SPRITE_SCALE * depth;
     var x = p.x + Math.sin(t * 0.00042 * p.sway + p.phase) * 26 * (p.s / 20);
 
+    // 花瓣绕自己的长轴翻面，侧面时压成一条线
+    var flip = Math.cos(p.rot * 1.35 + t * 0.0009 + p.phase);
+    if (flip > -0.07 && flip < 0.07) flip = flip < 0 ? -0.07 : 0.07;
+
     px.save();
-    px.globalAlpha = al;
+    px.globalAlpha = al * (0.5 + p.z * 0.5);
     px.translate(x, p.y);
     px.rotate(p.rot + Math.sin(t * 0.0006 + p.phase) * 0.3);
+    px.scale(flip, 1);
     px.drawImage(sprites[p.hi], -s * 0.5, -s * 0.5, s, s);
     px.restore();
   }
@@ -780,12 +1029,19 @@ a:focus-visible, button:focus-visible{
     var dt = Math.min(t - lastT, 48);
     lastT = t;
 
+    // 转球带起来的风，慢慢散掉
+    var w = wind;
+    if (w > 0.002){
+      wind *= Math.pow(0.93, dt / 16.667);
+      if (wind < 0.002) wind = 0;
+    }
+
     px.clearRect(0, 0, W, H);
     for (var i = 0; i < petals.length; i++){
       var p = petals[i];
-      p.y += p.vy * dt * 0.06;
-      p.x += p.vx * dt * 0.06;
-      p.rot += p.vr * dt * 0.06;
+      p.y += (p.vy + w * 0.55) * dt * 0.06;
+      p.x += (p.vx + w * windDir * 1.15) * dt * 0.06;
+      p.rot += (p.vr + w * windDir * 0.006) * dt * 0.06;
       if (p.y > H + 90 || p.x < -140 || p.x > W + 140){
         petals[i] = makePetal(true);
       } else {
@@ -804,7 +1060,6 @@ a:focus-visible, button:focus-visible{
   var ox = oc.getContext("2d");
   var stage = document.getElementById("stage");
   var stickyEl = stage.querySelector(".sticky");
-  var orbWord = document.querySelector(".orbWord");
 
   var N = 0;
   var SX, SY, SZ;                       // 球面单位坐标
@@ -812,6 +1067,14 @@ a:focus-visible, button:focus-visible{
   var GCH, GCO;                         // 字符索引 / 颜色索引
   var FX, FY;                           // 花形目标
   var BX, BY, BA;                       // 每帧屏幕坐标与 alpha
+  var DLY;                              // 每颗粒子的绽放延迟
+  var SD = [];                          // 星尘
+
+  var bridgeEl = document.getElementById("bridge");
+  var voicesEl = document.getElementById("voices");
+  var bridgeTop = 0, bridgeH = 1, voicesTop = 0, voicesH = 1;
+  var lastExitA = 1;
+  var bridgeChars = [];
   var NB = 16;                          // 字号档数
   var SIZE_STEP = 1.6;
   var FONTS = [];
@@ -845,6 +1108,24 @@ a:focus-visible, button:focus-visible{
   var SPIN = 0.00267;      // 每次 16.7ms 的自转量
   var FRICTION = 0.90;
   var TWO_PI = Math.PI * 2;
+  var wind = 0, windDir = 1;   // 转球带起来的风，吹动花瓣
+  var orbRunning = false;
+
+  function clampTilt(){
+    if (rotX > 1.0) rotX = 1.0;
+    if (rotX < -1.15) rotX = -1.15;
+  }
+
+  function startOrb(){
+    if (orbRunning) return;
+    orbRunning = true;
+    lastFrame = 0;
+    requestAnimationFrame(drawOrb);
+  }
+
+  function stopOrb(){
+    orbRunning = false;
+  }
 
   function onDown(e){
     if (e.button !== undefined && e.button !== 0 && e.pointerType === "mouse") return;
@@ -855,6 +1136,7 @@ a:focus-visible, button:focus-visible{
     lastY = e.clientY;
     velY = 0; velX = 0;
     oc.classList.add("dragging");
+    stickyEl.classList.add("is-dragging");
     try { oc.setPointerCapture(e.pointerId); } catch (err) {}
   }
 
@@ -868,11 +1150,14 @@ a:focus-visible, button:focus-visible{
 
     rotY -= dx * 0.0055;
     rotX += dy * 0.0042;
-    if (rotX > 1.0) rotX = 1.0;
-    if (rotX < -1.15) rotX = -1.15;
+    clampTilt();
 
     velY = -dx * 0.0055;
     velX = dy * 0.0042;
+
+    // 甩得越狠，风越大
+    if (dx) windDir = dx > 0 ? 1 : -1;
+    wind = Math.min(2.4, wind + Math.abs(dx) * 0.012 + Math.abs(dy) * 0.004);
 
     if (e.cancelable) e.preventDefault();
   }
@@ -882,6 +1167,20 @@ a:focus-visible, button:focus-visible{
     dragging = false;
     dragId = null;
     oc.classList.remove("dragging");
+    stickyEl.classList.remove("is-dragging");
+  }
+
+  function onKey(e){
+    var k = e.key;
+    var step = 0.14;
+    if (k === "ArrowLeft")       { rotY += step;  velY = step * 0.4; }
+    else if (k === "ArrowRight") { rotY -= step;  velY = -step * 0.4; }
+    else if (k === "ArrowUp")    { rotX -= step * 0.6; velX = -step * 0.15; }
+    else if (k === "ArrowDown")  { rotX += step * 0.6; velX = step * 0.15; }
+    else return;
+    clampTilt();
+    wind = Math.min(2.0, wind + 0.5);
+    e.preventDefault();
   }
 
   // 木棉五瓣轮廓
@@ -919,6 +1218,7 @@ a:focus-visible, button:focus-visible{
     GCH = new Uint8Array(N);  GCO = new Uint8Array(N);
     FX = new Float32Array(N); FY = new Float32Array(N);
     BX = new Float32Array(N); BY = new Float32Array(N); BA = new Float32Array(N);
+    DLY = new Float32Array(N);
 
     var base = (W < 700 ? OR * 0.066 : OR * 0.042);
     var ga = Math.PI * (3 - Math.sqrt(5));
@@ -935,9 +1235,13 @@ a:focus-visible, button:focus-visible{
       GCH[i] = (Math.random() * GLYPHS.length) | 0;
       GCO[i] = (Math.random() * NCOL) | 0;
       GA[i] = 0.55 + Math.random() * 0.45;
+      // 错峰绽放：沿 Fibonacci 螺旋依次开，带一点抖动
+      DLY[i] = ((i / N) * 0.86 + Math.random() * 0.14) * 0.42;
     }
 
-    var R = Math.min(W, H) * (W < 700 ? 0.42 : 0.40);
+    // 花形半径跟球心用同一个基准高度，避免手机地址栏伸缩时错位
+    var viewH = Math.round(stickyEl.clientHeight) || H;
+    var R = Math.min(W, viewH) * (W < 700 ? 0.42 : 0.40);
     var got = 0, guard = 0, maxGuard = N * 90;
     while (got < N && guard < maxGuard){
       guard++;
@@ -966,7 +1270,27 @@ a:focus-visible, button:focus-visible{
 
     FONTS = [];
     for (var s = 0; s < NB; s++){
-      FONTS.push((s * SIZE_STEP).toFixed(1) + 'px "Songti SC","STSong","Noto Serif CJK SC","SimSun",serif');
+      // 第 0 档不能是 0px，否则这个桶的字根本画不出来
+      var px0 = Math.max(6, s * SIZE_STEP);
+      FONTS.push(px0.toFixed(1) + 'px "Songti SC","STSong","Noto Serif CJK SC","SimSun",serif');
+    }
+
+    // 星尘：球外面一圈更远的碎光
+    var ns = W < 700 ? 22 : 46;
+    SD = [];
+    for (var q = 0; q < ns; q++){
+      var sy2 = Math.random() * 2 - 1;
+      var sr = Math.sqrt(Math.max(0, 1 - sy2 * sy2));
+      var sth = Math.random() * Math.PI * 2;
+      SD.push({
+        x: Math.cos(sth) * sr,
+        y: sy2,
+        z: Math.sin(sth) * sr,
+        d: 1.16 + Math.random() * 0.52,
+        s: 0.7 + Math.random() * 1.5,
+        ph: Math.random() * Math.PI * 2,
+        sp: 0.45 + Math.random() * 0.5
+      });
     }
   }
 
@@ -975,6 +1299,7 @@ a:focus-visible, button:focus-visible{
   }
 
   function drawOrb(t){
+    if (!orbRunning) return;      // 滚出视口就整条链断掉，不再排帧
     requestAnimationFrame(drawOrb);
 
     var p = scrollP;
@@ -986,8 +1311,8 @@ a:focus-visible, button:focus-visible{
 
     // 静止时降频：桌面 30fps、手机 20fps；滚动或拖动时恢复满帧
     tick++;
-    if (!moving && !REDUCED){
-      var stride = W < 700 ? 3 : 2;
+    if (!moving){
+      var stride = REDUCED ? 6 : (W < 700 ? 3 : 2);
       if (tick % stride !== 0) return;
     }
 
@@ -1043,19 +1368,29 @@ a:focus-visible, button:focus-visible{
       var fx = CX + FX[i] + Math.cos(ph) * burst;
       var fy = CY + FY[i] + Math.sin(ph) * burst;
 
-      BX[i] = sxp + (fx - sxp) * e;
-      BY[i] = syp + (fy - syp) * e;
+      // —— 错峰绽放：每颗按自己的延迟开，路径上走一道弧 ——
+      var dl = DLY[i];
+      var ti = (p - dl) / (1 - dl);
+      ti = ti < 0 ? 0 : (ti > 1 ? 1 : ti);
+      var ei = ti < 0.5 ? 4 * ti * ti * ti : 1 - Math.pow(-2 * ti + 2, 3) / 2;
+
+      var dx = fx - sxp, dy = fy - syp;
+      var len = Math.sqrt(dx * dx + dy * dy) || 1;
+      var arc = Math.sin(ei * Math.PI) * 22;
+
+      BX[i] = sxp + dx * ei - (dy / len) * arc;
+      BY[i] = syp + dy * ei + (dx / len) * arc;
 
       var depth = (1 - Z2) * 0.5;
       var nearSize = 0.55 + depth * 0.85;
-      var sz = GS[i] * (nearSize + (1 - nearSize) * e);
+      var sz = GS[i] * (nearSize + (1 - nearSize) * ei);
 
       var si = (sz * stepR) | 0;
       if (si < 0) si = 0; else if (si >= NB) si = NB - 1;
 
       var a0 = GA[i];
       var a = (0.22 + depth * 0.78) * a0;
-      BA[i] = a + (a0 - a) * e;
+      BA[i] = a + (a0 - a) * ei;
 
       var bi = si * NCOL + GCO[i];
       var L = blen[bi];
@@ -1065,17 +1400,38 @@ a:focus-visible, button:focus-visible{
       }
     }
 
+    // —— 星尘：球外面更远的一圈碎光，开花时褪去 ——
+    var sda = 1 - e;
+    if (sda > 0.02){
+      for (var q2 = 0; q2 < SD.length; q2++){
+        var d2 = SD[q2];
+        var Xs = d2.x * ca - d2.z * sa;
+        var Zs = d2.x * sa + d2.z * ca;
+        var Ys = d2.y * ct - Zs * st;
+        var Zs2 = d2.y * st + Zs * ct;
+        var ps = fov / (fov + Zs2 * OR);
+        var sxp2 = CX + Xs * OR * ps * d2.d * born;
+        var syp2 = CY + Ys * OR * ps * d2.d * born;
+        var tw = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 0.0018 * d2.sp + d2.ph));
+        var dpt = (1 - (Zs2 + 1) * 0.5);
+        ox.globalAlpha = (0.08 + 0.55 * dpt) * sda * tw;
+        ox.fillStyle = (q2 % 3 === 0) ? "rgba(241,231,216,1)" : "rgba(228,99,58,1)";
+        var ss = d2.s * (0.7 + dpt * 0.8);
+        ox.fillRect(sxp2 - ss * 0.5, syp2 - ss * 0.5, ss, ss);
+      }
+    }
+
     ox.globalAlpha = 1;
     for (var s = 0; s < NB; s++){
       var drew = false;
       for (var c = 0; c < NCOL; c++){
         var idx = s * NCOL + c;
-        var len = blen[idx];
-        if (!len) continue;
+        var len2 = blen[idx];
+        if (!len2) continue;
         if (!drew){ ox.font = FONTS[s]; drew = true; }
         ox.fillStyle = COLS[c];
         var arr = buckets[idx];
-        for (var k = 0; k < len; k++){
+        for (var k = 0; k < len2; k++){
           var q = arr[k];
           var al = BA[q];
           if (al <= 0.012) continue;
@@ -1084,6 +1440,20 @@ a:focus-visible, button:focus-visible{
         }
       }
     }
+
+    // —— 受光面：光从左上打过来，随自转慢慢摆 ——
+    var lx = CX + Math.sin(rotY) * OR * 0.40;
+    var ly = CY - OR * 0.33;
+    var lr = OR * 0.95;
+    var lg = ox.createRadialGradient(lx, ly, 0, lx, ly, lr);
+    lg.addColorStop(0,    "rgba(255,216,184,0.115)");
+    lg.addColorStop(0.45, "rgba(228,99,58,0.038)");
+    lg.addColorStop(1,    "rgba(206,66,41,0)");
+    ox.globalCompositeOperation = "lighter";
+    ox.globalAlpha = Math.max(0, 1 - e * 1.45);
+    ox.fillStyle = lg;
+    ox.fillRect(lx - lr, ly - lr, lr * 2, lr * 2);
+    ox.globalCompositeOperation = "source-over";
 
     // 球心暖光（预建渐变，只改透明度）
     ox.globalAlpha = 0.05 + 0.15 * (1 - e * 0.8);
@@ -1095,21 +1465,88 @@ a:focus-visible, button:focus-visible{
 
   /* ---------- 滚动驱动 ---------- */
 
+  function smooth(x){ x = x < 0 ? 0 : (x > 1 ? 1 : x); return x * x * (3 - 2 * x); }
+
   function measureStage(){
     stageTop = stage.getBoundingClientRect().top + window.scrollY;
     stageH = stage.offsetHeight;
     stageSpan = Math.max(1, stageH - H);
+
+    if (bridgeEl){
+      bridgeTop = bridgeEl.getBoundingClientRect().top + window.scrollY;
+      bridgeH = Math.max(1, bridgeEl.offsetHeight);
+    }
+    if (voicesEl){
+      voicesTop = voicesEl.getBoundingClientRect().top + window.scrollY;
+      voicesH = Math.max(1, voicesEl.offsetHeight);
+    }
+  }
+
+  // 逐字被"念"出来
+  function updateBridge(sy){
+    if (!bridgeChars.length) return;
+    var prog = (sy + H - bridgeTop) / (H * 0.95 + bridgeH * 0.25);
+    prog = prog < 0 ? 0 : (prog > 1 ? 1 : prog);
+    var n = bridgeChars.length;
+    for (var i = 0; i < n; i++){
+      var k = prog * 1.5 - (i / n) * 0.55;
+      k = k < 0 ? 0 : (k > 1 ? 1 : k);
+      bridgeChars[i].style.setProperty("--k", k.toFixed(3));
+    }
+  }
+
+  // 语言墙随滚动被织出来
+  function updateVoices(sy){
+    if (!voiceEls.length) return;
+    var prog = (sy + H - voicesTop) / (H * 0.62 + voicesH * 0.5);
+    prog = prog < 0 ? 0 : (prog > 1 ? 1 : prog);
+    var n = voiceEls.length;
+    for (var i = 0; i < n; i++){
+      var k = prog * 1.75 - (i / n) * 0.62;
+      k = k < 0 ? 0 : (k > 1 ? 1 : k);
+      voiceEls[i].style.setProperty("--k", k.toFixed(3));
+    }
   }
 
   function readScroll(){
-    var p = (window.scrollY - stageTop) / stageSpan;
+    var sy = window.scrollY;
+
+    var p = (sy - stageTop) / stageSpan;
     p = p < 0 ? 0 : (p > 1 ? 1 : p);
     scrollP = p;
-    stage.classList.toggle("late", p > 0.46);
 
-    var bottom = stageTop + stageH - window.scrollY;
+    // 名字 → 这句话：连续交叉，不再一刀切
+    var herA = 1 - smooth((p - 0.28) / 0.22);
+    var loveA = smooth((p - 0.40) / 0.22);
+    stickyEl.style.setProperty("--her-a", herA.toFixed(3));
+    stickyEl.style.setProperty("--love-a", loveA.toFixed(3));
+
+    var bottom = stageTop + stageH - sy;
     var vis = bottom / H;
     petalAlpha = 0.35 + 0.65 * (vis < 0 ? 0 : (vis > 1 ? 1 : vis));
+
+    // 这一幕滚完之后整块淡出，否则会在下一幕顶上露出一截
+    var exit = (sy - (stageTop + stageSpan)) / (H * 0.55);
+    exit = exit < 0 ? 0 : (exit > 1 ? 1 : exit);
+    var exitA = 1 - exit;
+    if (Math.abs(exitA - lastExitA) > 0.008){
+      lastExitA = exitA;
+      stickyEl.style.opacity = exitA.toFixed(3);
+    }
+
+    updateBridge(sy);
+    updateVoices(sy);
+  }
+
+  // scroll 合并到每帧一次，避免一帧里算好几遍
+  var scrollQueued = false;
+  function onScroll(){
+    if (scrollQueued) return;
+    scrollQueued = true;
+    requestAnimationFrame(function(){
+      scrollQueued = false;
+      readScroll();
+    });
   }
 
   /* ---------- 尺寸 ---------- */
@@ -1147,11 +1584,16 @@ a:focus-visible, button:focus-visible{
     if (REDUCED) introT0 = performance.now() - 2000;
 
     measureStage();
-    window.addEventListener("scroll", readScroll, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize);
     readScroll();
     // 字体/图片加载后布局可能变，再量一次
-    setTimeout(measureStage, 600);
+    setTimeout(function(){ measureStage(); readScroll(); }, 600);
+
+    // 收束幕的逐字动画
+    if (bridgeEl){
+      bridgeChars = [].slice.call(bridgeEl.querySelectorAll(".bridge-line span:not(.br)"));
+    }
 
     // 拖动转球
     oc.addEventListener("pointerdown", onDown);
@@ -1159,13 +1601,25 @@ a:focus-visible, button:focus-visible{
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
 
+    // 键盘也能转
+    oc.addEventListener("keydown", onKey);
+
     if (!REDUCED){
       requestAnimationFrame(loopPetals);
     } else {
       petals.forEach(function(pt){ drawPetal(pt, 0); });
     }
-    // 球始终跑循环：拖动要有实时反馈
-    requestAnimationFrame(drawOrb);
+
+    // 球滚出视口就停掉 rAF，省电
+    if ("IntersectionObserver" in window){
+      new IntersectionObserver(function(es){
+        es.forEach(function(e){
+          if (!entered) return;
+          if (e.isIntersecting) startOrb(); else stopOrb();
+        });
+      }, { threshold: 0 }).observe(stage);
+    }
+    // 不在这里起球：等观众点了「进入」
   }
 
   if (document.readyState === "loading"){
@@ -1176,16 +1630,151 @@ a:focus-visible, button:focus-visible{
 
   /* ---------- 再开一朵 ---------- */
 
-  document.getElementById("bloomBtn").addEventListener("click", function(){
-    for (var i = 0; i < 26; i++){
-      var p = makePetal(false);
-      p.y = H + 20 + Math.random() * 120;
-      p.vy = 0.9 + Math.random() * 1.5;
-      p.vx = (Math.random() - 0.5) * 1.4;
-      p.a = 0.5 + Math.random() * 0.4;
-      petals.push(p);
+  var bloomBtn = document.getElementById("bloomBtn");
+  var sealSvg = document.querySelector(".sign .seal");
+
+  function pulseBtn(){
+    bloomBtn.classList.remove("pulse");
+    void bloomBtn.offsetWidth;     // 强制回流，让动画能重播
+    bloomBtn.classList.add("pulse");
+  }
+
+  bloomBtn.addEventListener("click", function(){
+    pulseBtn();
+
+    if (!REDUCED){
+      // 先铺好花瓣：从屏幕上方落下，滚回顶部时才看得到
+      for (var i = 0; i < 28; i++){
+        var p = makePetal(true);
+        p.vy = 0.55 + Math.random() * 0.9;
+        p.vx = (Math.random() - 0.5) * 0.9;
+        p.a = 0.4 + Math.random() * 0.45;
+        petals.push(p);
+      }
+      if (petals.length > 130) petals.splice(0, petals.length - 130);
+      wind = 1.2;
+    } else {
+      // 减少动态效果时：不开粒子，改开一朵纯 CSS 的花
+      if (sealSvg){
+        var clone = sealSvg.cloneNode(true);
+        clone.removeAttribute("class");
+        clone.classList.add("burst-flower");
+        clone.setAttribute("aria-hidden", "true");
+        document.body.appendChild(clone);
+        setTimeout(function(){ if (clone.parentNode) clone.parentNode.removeChild(clone); }, 1700);
+      }
     }
-    if (petals.length > 130) petals.splice(0, petals.length - 130);
+
+    // 回到最上面，从头再看一遍
+    window.scrollTo({ top: 0, behavior: REDUCED ? "auto" : "smooth" });
+  });
+
+
+  /* ---------- 背景音乐 ---------- */
+
+  var bgm = document.getElementById("bgm");
+  var bgmBtn = document.getElementById("bgmBtn");
+  var bgmOn = false;
+  var bgmMuted = false;        // 用户主动关掉的，就别再自动响
+  bgmBtn.classList.add("hint");   // 还没响过，轻轻呼吸一下
+
+  function setBgmState(on){
+    bgmOn = on;
+    bgmBtn.classList.toggle("on", on);
+    if (on) bgmBtn.classList.remove("hint");
+    bgmBtn.setAttribute("aria-pressed", on ? "true" : "false");
+    bgmBtn.setAttribute("aria-label", on ? "关闭背景音乐" : "播放背景音乐");
+  }
+
+  // 背景音乐的音量。0.5 偏抢戏，0.3 以下几乎听不清，0.34 刚好垫在画面后面
+  var BGM_VOL = 0.34;
+  var bgmFade = null;
+
+  function fadeTo(target){
+    if (bgmFade) clearInterval(bgmFade);
+    var v = bgm.volume;
+    bgmFade = setInterval(function(){
+      v += (target - v) * 0.12 + 0.004;
+      if (v >= target){ v = target; clearInterval(bgmFade); bgmFade = null; }
+      bgm.volume = v;
+    }, 60);
+  }
+
+  // 开播。先直接试 —— 浏览器若允许（回访、已授权、桌面已交互过）就直接响
+  function playBgm(){
+    if (!bgm.paused) return;
+    bgmMuted = false;
+    bgm.volume = 0;
+    var pr = bgm.play();
+    if (pr && pr.then){
+      pr.then(function(){
+        setBgmState(true);
+        fadeTo(BGM_VOL);
+      }).catch(function(){
+        // 被自动播放策略拦下：保持沉默，等第一次真正的手势
+        bgm.volume = BGM_VOL;
+      });
+    }
+  }
+
+  bgmBtn.addEventListener("click", function(e){
+    e.stopPropagation();
+    if (bgm.paused){
+      playBgm();
+    } else {
+      bgm.pause();
+      bgmMuted = true;
+      setBgmState(false);
+    }
+  });
+
+  // 兜底：进入之后任何一次手势都保证音乐在响
+  function firstGesture(){
+    if (!entered) return;
+    if (!bgmOn && !bgmMuted && bgm.paused) playBgm();
+  }
+  ["pointerdown", "touchend", "keydown", "click"].forEach(function(ev){
+    window.addEventListener(ev, firstGesture, { passive: true });
+  });
+
+
+  /* ---------- 进入 ---------- */
+
+  var coverEl = document.getElementById("cover");
+  var enterBtnEl = document.getElementById("enterBtn");
+
+  function enter(){
+    if (entered) return;
+    entered = true;
+
+    // 解锁滚动、收起入口
+    document.body.classList.remove("locked");
+    coverEl.classList.add("gone");
+    setTimeout(function(){ coverEl.style.display = "none"; }, 1300);
+
+    // 球从这一刻才开始飞入
+    introT0 = performance.now();
+    startOrb();
+
+    // 入口挡着的时候量到的位置不准，重算一次
+    measureStage();
+    readScroll();
+
+    // 这一下是明确的手势，音乐必响
+    playBgm();
+  }
+
+  coverEl.addEventListener("click", enter);
+  enterBtnEl.addEventListener("click", function(e){
+    e.stopPropagation();
+    enter();
+  });
+  window.addEventListener("keydown", function(e){
+    if (entered) return;
+    if (e.key === "Enter" || e.key === " " || e.key === "Spacebar"){
+      e.preventDefault();
+      enter();
+    }
   });
 
 })();
