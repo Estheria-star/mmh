@@ -54,40 +54,25 @@ body{
 /* ---------- 大气层 / 纹理 ---------- */
 
 .atmos{
-  position:fixed; inset:-25%;
+  position:fixed; inset:-12%;
   z-index:0;
   pointer-events:none;
   background:
-    radial-gradient(36% 30% at 50% 40%, rgba(206,66,41,.16), transparent 62%),
-    radial-gradient(28% 24% at 15% 78%, rgba(96,48,120,.11), transparent 68%),
-    radial-gradient(32% 28% at 87% 14%, rgba(201,162,107,.06), transparent 66%),
-    radial-gradient(78% 78% at 50% 50%, rgba(10,6,14,0), rgba(3,2,5,.9) 100%);
-  filter:blur(26px) saturate(112%);
-  animation:atm 38s ease-in-out infinite alternate;
+    radial-gradient(38% 32% at 50% 40%, rgba(206,66,41,.16), transparent 62%),
+    radial-gradient(30% 26% at 15% 78%, rgba(96,48,120,.11), transparent 68%),
+    radial-gradient(34% 30% at 87% 14%, rgba(201,162,107,.06), transparent 66%),
+    radial-gradient(80% 80% at 50% 50%, rgba(10,6,14,0), rgba(3,2,5,.9) 100%);
 }
-@keyframes atm{
-  from{ transform:translate3d(-1.5%,-1%,0) scale(1.02); }
-  to  { transform:translate3d(1.5%,1.5%,0) scale(1.08); }
-}
-
 .grain{
   position:fixed; inset:0;
   z-index:90;
   pointer-events:none;
-  opacity:.045;
-  mix-blend-mode:overlay;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size:220px 220px;
-}
-
-.weave{
-  position:fixed; inset:0;
-  z-index:91;
-  pointer-events:none;
-  opacity:.022;
+  opacity:.04;
   background-image:
-    repeating-linear-gradient(0deg,  rgba(255,255,255,.7) 0 1px, transparent 1px 4px),
-    repeating-linear-gradient(90deg, rgba(255,255,255,.7) 0 1px, transparent 1px 4px);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(0deg,  rgba(255,255,255,.3) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.3) 0 1px, transparent 1px 4px);
+  background-size:220px 220px, auto, auto;
 }
 
 #petals{
@@ -137,7 +122,12 @@ main{ position:relative; z-index:3; }
   inset:0;
   width:100%;
   height:100%;
+  touch-action:pan-y;
+  cursor:grab;
+  -webkit-user-select:none;
+  user-select:none;
 }
+#orb.dragging{ cursor:grabbing; }
 
 .orbWord{
   position:relative;
@@ -153,7 +143,6 @@ main{ position:relative; z-index:3; }
   width:178%; height:236%;
   transform:translate(-50%,-50%);
   background:radial-gradient(44% 44% at 50% 50%, rgba(5,3,8,.88), rgba(5,3,8,.62) 42%, rgba(5,3,8,.24) 64%, transparent 76%);
-  filter:blur(12px);
   z-index:-1;
 }
 
@@ -205,9 +194,9 @@ main{ position:relative; z-index:3; }
   flex-direction:column;
   align-items:center;
   gap:.9em;
-  font-size:.62rem;
-  letter-spacing:.44em;
-  text-indent:.44em;
+  font-size:.6rem;
+  letter-spacing:.3em;
+  text-indent:.3em;
   color:rgba(201,162,107,.62);
   text-shadow:0 0 14px rgba(3,2,5,.95), 0 0 28px rgba(3,2,5,.9);
   transition:opacity .8s ease;
@@ -464,7 +453,7 @@ a:focus-visible, button:focus-visible{
         <span class="word-her">米文慧</span>
         <span class="word-love">我喜欢你</span>
       </div>
-      <div class="stageHint" aria-hidden="true">向下</div>
+      <div class="stageHint" aria-hidden="true">拖动球，或向下</div>
     </div>
   </section>
 
@@ -570,8 +559,6 @@ a:focus-visible, button:focus-visible{
 </main>
 
 <div class="grain" aria-hidden="true"></div>
-<div class="weave" aria-hidden="true"></div>
-
 <script>
 (function(){
   "use strict";
@@ -697,16 +684,60 @@ a:focus-visible, button:focus-visible{
   var petals = [];
   var petalAlpha = 1;
 
+  var sprites = null;
+  var SPRITE_BASE = 56;
+  var SPRITE_SCALE = 128 / 56;
+
+  function buildSprites(){
+    var hues = [8, 11, 14, 17, 20, 23];
+    sprites = [];
+    for (var i = 0; i < hues.length; i++){
+      var h = hues[i];
+      var S = 128;
+      var cv = document.createElement("canvas");
+      cv.width = S; cv.height = S;
+      var g = cv.getContext("2d");
+      var cx = S / 2;
+      var cy = S / 2 + SPRITE_BASE * 0.13;
+      var size = SPRITE_BASE;
+
+      var paint = function(){
+        g.beginPath();
+        g.moveTo(cx, cy + size * 0.62);
+        g.bezierCurveTo(cx - size * 0.66, cy + size * 0.18, cx - size * 0.52, cy - size * 0.52, cx, cy - size * 0.88);
+        g.bezierCurveTo(cx + size * 0.52, cy - size * 0.52, cx + size * 0.66, cy + size * 0.18, cx, cy + size * 0.62);
+        g.closePath();
+      };
+
+      paint();
+      g.fillStyle = "hsla(" + h + ",68%,26%,0.95)";
+      g.fill();
+
+      var rg = g.createRadialGradient(cx, cy - size * 0.26, size * 0.02, cx, cy, size * 0.98);
+      rg.addColorStop(0,    "hsla(" + (h + 8) + ",84%,60%,0.88)");
+      rg.addColorStop(0.48, "hsla(" + (h + 3) + ",78%,44%,0.52)");
+      rg.addColorStop(1,    "hsla(" + h + ",74%,34%,0)");
+      paint();
+      g.fillStyle = rg;
+      g.fill();
+
+      sprites.push(cv);
+    }
+  }
+
   function sizePetals(){
-    pc.width = Math.floor(window.innerWidth * DPR);
-    pc.height = Math.floor(window.innerHeight * DPR);
-    pc.style.width = window.innerWidth + "px";
-    pc.style.height = window.innerHeight + "px";
+    pc.width = Math.floor(W * DPR);
+    pc.height = Math.floor(H * DPR);
+    pc.style.width = W + "px";
+    pc.style.height = H + "px";
     px.setTransform(DPR, 0, 0, DPR, 0, 0);
   }
 
   function makePetal(fromTop){
     var big = Math.random() > 0.76;
+    var hue = 7 + Math.random() * 15;
+    var hi = ((hue - 7) / 15 * 5) | 0;
+    if (hi > 5) hi = 5;
     return {
       x: Math.random() * W,
       y: fromTop ? -80 - Math.random() * H * 0.7 : Math.random() * H,
@@ -717,50 +748,29 @@ a:focus-visible, button:focus-visible{
       vr: (Math.random() - 0.5) * 0.012,
       sway: 0.4 + Math.random() * 1.5,
       phase: Math.random() * Math.PI * 2,
-      hue: 7 + Math.random() * 15,
-      a: big ? 0.18 + Math.random() * 0.16 : 0.42 + Math.random() * 0.4,
-      blur: big ? 1.3 : 0
+      hi: hi,
+      a: big ? 0.18 + Math.random() * 0.16 : 0.42 + Math.random() * 0.4
     };
   }
 
   function resetPetals(){
-    var n = W < 700 ? 18 : 38;
+    var n = W < 700 ? 12 : 28;
     petals = [];
     for (var i = 0; i < n; i++) petals.push(makePetal(false));
   }
 
-  function petalPath(size){
-    px.beginPath();
-    px.moveTo(0, size * 0.62);
-    px.bezierCurveTo(-size * 0.66, size * 0.18, -size * 0.52, -size * 0.52, 0, -size * 0.88);
-    px.bezierCurveTo( size * 0.52, -size * 0.52,  size * 0.66, size * 0.18, 0, size * 0.62);
-    px.closePath();
-  }
-
   function drawPetal(p, t){
-    var size = p.s;
     var al = p.a * petalAlpha;
     if (al <= 0.004) return;
 
+    var s = p.s * SPRITE_SCALE;
     var x = p.x + Math.sin(t * 0.00042 * p.sway + p.phase) * 26 * (p.s / 20);
 
     px.save();
-    if (p.blur) px.filter = "blur(" + p.blur + "px)";
+    px.globalAlpha = al;
     px.translate(x, p.y);
     px.rotate(p.rot + Math.sin(t * 0.0006 + p.phase) * 0.3);
-
-    petalPath(size);
-    px.fillStyle = "hsla(" + p.hue + ",68%,26%," + (al * 0.92).toFixed(3) + ")";
-    px.fill();
-
-    var g = px.createRadialGradient(0, -size * 0.26, size * 0.02, 0, 0, size * 0.98);
-    g.addColorStop(0,    "hsla(" + (p.hue + 8) + ",84%,60%," + (al * 0.85).toFixed(3) + ")");
-    g.addColorStop(0.48, "hsla(" + (p.hue + 3) + ",78%,44%," + (al * 0.5).toFixed(3) + ")");
-    g.addColorStop(1,    "hsla(" + p.hue + ",74%,34%,0)");
-    petalPath(size);
-    px.fillStyle = g;
-    px.fill();
-
+    px.drawImage(sprites[p.hi], -s * 0.5, -s * 0.5, s, s);
     px.restore();
   }
 
@@ -793,14 +803,86 @@ a:focus-visible, button:focus-visible{
   var oc = document.getElementById("orb");
   var ox = oc.getContext("2d");
   var stage = document.getElementById("stage");
+  var stickyEl = stage.querySelector(".sticky");
   var orbWord = document.querySelector(".orbWord");
 
-  var P = [];          // 粒子
-  var OR = 0;          // 球半径
+  var N = 0;
+  var SX, SY, SZ;                       // 球面单位坐标
+  var GS, GPH, GA;                      // 字号 / 相位 / 亮度系数
+  var GCH, GCO;                         // 字符索引 / 颜色索引
+  var FX, FY;                           // 花形目标
+  var BX, BY, BA;                       // 每帧屏幕坐标与 alpha
+  var NB = 16;                          // 字号档数
+  var SIZE_STEP = 1.6;
+  var FONTS = [];
+  var COLS = [
+    "rgba(206,66,41,1)",
+    "rgba(228,99,58,1)",
+    "rgba(201,162,107,1)",
+    "rgba(241,231,216,1)",
+    "rgba(180,58,38,1)"
+  ];
+  var NCOL = 5;
+  var buckets = [];
+  var blen = null;
+
+  var OR = 0;
   var CX = 0, CY = 0;
-  var scrollP = 0;     // 0 = 星球，1 = 花
-  var introT0 = 0;
-  var lastFrame = 0;
+  var scrollP = 0, lastP = -1;
+  var introT0 = 0, lastFrame = 0;
+  var glowGrad = null;
+  var stageTop = 0, stageH = 0, stageSpan = 1;
+  var tick = 0;
+
+  /* ---------- 拖动转球 ---------- */
+
+  var rotY = 0;            // 绕 Y（左右拖）
+  var rotX = -0.30;        // 绕 X（上下拖）
+  var velY = 0, velX = 0;  // 松手后的惯性
+  var dragging = false;
+  var dragId = null;
+  var lastX = 0, lastY = 0;
+  var SPIN = 0.00267;      // 每次 16.7ms 的自转量
+  var FRICTION = 0.90;
+  var TWO_PI = Math.PI * 2;
+
+  function onDown(e){
+    if (e.button !== undefined && e.button !== 0 && e.pointerType === "mouse") return;
+    if (scrollP > 0.35) return;
+    dragging = true;
+    dragId = e.pointerId;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    velY = 0; velX = 0;
+    oc.classList.add("dragging");
+    try { oc.setPointerCapture(e.pointerId); } catch (err) {}
+  }
+
+  function onMove(e){
+    if (!dragging || e.pointerId !== dragId) return;
+    var dx = e.clientX - lastX;
+    var dy = e.clientY - lastY;
+    if (!dx && !dy) return;
+    lastX = e.clientX;
+    lastY = e.clientY;
+
+    rotY -= dx * 0.0055;
+    rotX += dy * 0.0042;
+    if (rotX > 1.0) rotX = 1.0;
+    if (rotX < -1.15) rotX = -1.15;
+
+    velY = -dx * 0.0055;
+    velX = dy * 0.0042;
+
+    if (e.cancelable) e.preventDefault();
+  }
+
+  function onUp(e){
+    if (e.pointerId !== dragId) return;
+    dragging = false;
+    dragId = null;
+    oc.classList.remove("dragging");
+  }
 
   // 木棉五瓣轮廓
   function flowerRadius(theta){
@@ -809,60 +891,82 @@ a:focus-visible, button:focus-visible{
   }
 
   function sizeOrb(){
-    var w = window.innerWidth, h = window.innerHeight;
-    oc.width = Math.floor(w * DPR);
-    oc.height = Math.floor(h * DPR);
-    oc.style.width = w + "px";
-    oc.style.height = h + "px";
+    // 用 sticky 的实际高度，才能和居中放的名字对齐（手机上 100svh ≠ innerHeight）
+    var sh = Math.round(stickyEl.clientHeight) || H;
+
+    oc.width = Math.floor(W * DPR);
+    oc.height = Math.floor(sh * DPR);
+    oc.style.width = W + "px";
+    oc.style.height = sh + "px";
     ox.setTransform(DPR, 0, 0, DPR, 0, 0);
-    CX = w / 2;
-    CY = h / 2;
-    OR = Math.min(w, h) * (w < 700 ? 0.40 : 0.335);
+    ox.textAlign = "center";
+    ox.textBaseline = "middle";
+    CX = W / 2;
+    CY = sh / 2;
+    OR = Math.min(W, sh) * (W < 700 ? 0.40 : 0.335);
+
+    glowGrad = ox.createRadialGradient(CX, CY, 0, CX, CY, OR * 1.5);
+    glowGrad.addColorStop(0,   "rgba(228,99,58,0.22)");
+    glowGrad.addColorStop(0.5, "rgba(206,66,41,0.09)");
+    glowGrad.addColorStop(1,   "rgba(206,66,41,0)");
   }
 
   function buildParticles(){
-    var n = W < 700 ? 330 : 680;
-    P = [];
+    N = W < 700 ? 220 : 560;
 
-    // —— 球面坐标（Fibonacci 均匀分布）——
+    SX = new Float32Array(N); SY = new Float32Array(N); SZ = new Float32Array(N);
+    GS = new Float32Array(N); GPH = new Float32Array(N); GA = new Float32Array(N);
+    GCH = new Uint8Array(N);  GCO = new Uint8Array(N);
+    FX = new Float32Array(N); FY = new Float32Array(N);
+    BX = new Float32Array(N); BY = new Float32Array(N); BA = new Float32Array(N);
+
+    var base = (W < 700 ? OR * 0.066 : OR * 0.042);
     var ga = Math.PI * (3 - Math.sqrt(5));
-    for (var i = 0; i < n; i++){
-      var y = 1 - (i + 0.5) / n * 2;
+
+    for (var i = 0; i < N; i++){
+      var y = 1 - (i + 0.5) / N * 2;
       var r = Math.sqrt(Math.max(0, 1 - y * y));
       var th = i * ga;
-      P.push({
-        sx: Math.cos(th) * r,
-        sy: y,
-        sz: Math.sin(th) * r,
-        ch: GLYPHS[(Math.random() * GLYPHS.length) | 0],
-        size: (W < 700 ? OR * 0.078 : OR * 0.042) * (0.78 + Math.random() * 0.56),
-        col: WARM[(Math.random() * WARM.length) | 0],
-        a: 0.55 + Math.random() * 0.45,
-        ph: Math.random() * Math.PI * 2,
-        spin: 0.72 + Math.random() * 0.56
-      });
+      SX[i] = Math.cos(th) * r;
+      SY[i] = y;
+      SZ[i] = Math.sin(th) * r;
+      GS[i] = base * (0.78 + Math.random() * 0.56);
+      GPH[i] = Math.random() * Math.PI * 2;
+      GCH[i] = (Math.random() * GLYPHS.length) | 0;
+      GCO[i] = (Math.random() * NCOL) | 0;
+      GA[i] = 0.55 + Math.random() * 0.45;
     }
 
-    // —— 花形目标点 ——
-    var pts = [];
-    var guard = 0;
     var R = Math.min(W, H) * (W < 700 ? 0.42 : 0.40);
-    while (pts.length < n && guard < n * 60){
+    var got = 0, guard = 0, maxGuard = N * 90;
+    while (got < N && guard < maxGuard){
       guard++;
       var tt = Math.random() * Math.PI * 2;
       var rr = Math.sqrt(Math.random());
       var rMax = flowerRadius(tt);
-      if (rr > rMax) continue;
-      if (rr < 0.185) continue;
+      if (rr > rMax || rr < 0.185) continue;
       var edge = 0.66 + 0.34 * Math.pow(rr / rMax, 0.8);
       if (Math.random() > edge) continue;
-      pts.push({ x: Math.cos(tt) * rr * R, y: Math.sin(tt) * rr * R });
+      FX[got] = Math.cos(tt) * rr * R;
+      FY[got] = Math.sin(tt) * rr * R;
+      got++;
+    }
+    while (got < N){
+      var a2 = Math.random() * Math.PI * 2;
+      var r2 = R * (0.3 + Math.random() * 0.55);
+      FX[got] = Math.cos(a2) * r2;
+      FY[got] = Math.sin(a2) * r2;
+      got++;
     }
 
-    for (var j = 0; j < P.length; j++){
-      var fp = pts[j % pts.length] || { x: 0, y: 0 };
-      P[j].fx = fp.x;
-      P[j].fy = fp.y;
+    var total = NB * NCOL;
+    buckets = [];
+    for (var k = 0; k < total; k++) buckets.push(new Uint16Array(N));
+    blen = new Uint16Array(total);
+
+    FONTS = [];
+    for (var s = 0; s < NB; s++){
+      FONTS.push((s * SIZE_STEP).toFixed(1) + 'px "Songti SC","STSong","Noto Serif CJK SC","SimSun",serif');
     }
   }
 
@@ -871,110 +975,141 @@ a:focus-visible, button:focus-visible{
   }
 
   function drawOrb(t){
+    requestAnimationFrame(drawOrb);
+
+    var p = scrollP;
+    var spinning = dragging ||
+                   Math.abs(velY) > 0.00004 ||
+                   Math.abs(velX) > 0.00004;
+    var moving = Math.abs(p - lastP) > 0.0012 || spinning;
+    lastP = p;
+
+    // 静止时降频：桌面 30fps、手机 20fps；滚动或拖动时恢复满帧
+    tick++;
+    if (!moving && !REDUCED){
+      var stride = W < 700 ? 3 : 2;
+      if (tick % stride !== 0) return;
+    }
+
     if (!lastFrame) lastFrame = t;
     var df = Math.min(Math.max((t - lastFrame) / 16.667, 0.2), 3);
     lastFrame = t;
 
-    var w = window.innerWidth, h = window.innerHeight;
-    ox.clearRect(0, 0, w, h);
-    if (!OR) return;
+    ox.clearRect(0, 0, W, H);
+    if (!OR || !N) return;
 
-    var p = scrollP;
     var e = easeInOut(p);
 
-    // 收集
-    var ang = t * 0.00016;
-    var tilt = -0.30 + p * 0.30;
-    var ca = Math.cos(ang), sa = Math.sin(ang);
+    // 自转 + 惯性
+    if (!dragging){
+      rotY += SPIN * df * (REDUCED ? 0 : 1);
+      rotY += velY * df;
+      rotX += velX * df;
+      velY *= FRICTION;
+      velX *= FRICTION;
+      if (Math.abs(velY) < 0.00003) velY = 0;
+      if (Math.abs(velX) < 0.00003) velX = 0;
+    }
+    if (rotY > TWO_PI) rotY -= TWO_PI;
+    if (rotY < -TWO_PI) rotY += TWO_PI;
+
+    // 变成花的时候，倾斜自动归零
+    var tilt = (rotX + 0.30) * (1 - e) - 0.30 + p * 0.30;
+    var ca = Math.cos(rotY), sa = Math.sin(rotY);
     var ct = Math.cos(tilt), st = Math.sin(tilt);
 
-    // 入场：粒子从远处聚成球
     var intro = REDUCED ? 1 : Math.min(1, (t - introT0) / 1500);
-    var introEase = easeInOut(intro);
-    var born = 2.4 * (1 - introEase) + 1;
+    var born = 2.4 * (1 - easeInOut(intro)) + 1;
 
     var fov = OR * 2.9;
-    var list = [];
+    var burst = Math.sin(p * Math.PI) * 26;
+    var stepR = 1 / SIZE_STEP;
 
-    for (var i = 0; i < P.length; i++){
-      var q = P[i];
+    for (var b = 0; b < blen.length; b++) blen[b] = 0;
 
-      // —— 球面投影 ——
-      var X = q.sx * ca - q.sz * sa;
-      var Z = q.sx * sa + q.sz * ca;
-      var Y = q.sy;
-      var Y2 = Y * ct - Z * st;
-      var Z2 = Y * st + Z * ct;
+    for (var i = 0; i < N; i++){
+      var sx0 = SX[i], sy0 = SY[i], sz0 = SZ[i];
+
+      var X = sx0 * ca - sz0 * sa;
+      var Z = sx0 * sa + sz0 * ca;
+      var Y2 = sy0 * ct - Z * st;
+      var Z2 = sy0 * st + Z * ct;
 
       var persp = fov / (fov + Z2 * OR);
-      var sx = CX + X * OR * persp * born;
-      var sy = CY + Y2 * OR * persp * born;
+      var sxp = CX + X * OR * persp * born;
+      var syp = CY + Y2 * OR * persp * born;
 
-      // —— 花形 ——
-      var fx = CX + q.fx;
-      var fy = CY + q.fy;
+      var ph = GPH[i];
+      var fx = CX + FX[i] + Math.cos(ph) * burst;
+      var fy = CY + FY[i] + Math.sin(ph) * burst;
 
-      // 过渡中炸一下
-      var burst = Math.sin(p * Math.PI) * 26;
-      var bx = Math.cos(q.ph) * burst;
-      var by = Math.sin(q.ph) * burst;
+      BX[i] = sxp + (fx - sxp) * e;
+      BY[i] = syp + (fy - syp) * e;
 
-      var x = sx + (fx - sx) * e + bx;
-      var y = sy + (fy - sy) * e + by;
-
-      // 深度决定大小与亮度
-      var depth = (1 - Z2) / 2;                       // 1 近 / 0 远
+      var depth = (1 - Z2) * 0.5;
       var nearSize = 0.55 + depth * 0.85;
-      var size = q.size * (nearSize + (1 - nearSize) * e);
-      var alpha = (0.22 + depth * 0.78) * q.a;
-      alpha = alpha + (q.a - alpha) * e;
+      var sz = GS[i] * (nearSize + (1 - nearSize) * e);
 
-      list.push({
-        x: x, y: y, z: Z2,
-        size: size,
-        alpha: alpha,
-        ch: q.ch,
-        col: q.col
-      });
+      var si = (sz * stepR) | 0;
+      if (si < 0) si = 0; else if (si >= NB) si = NB - 1;
+
+      var a0 = GA[i];
+      var a = (0.22 + depth * 0.78) * a0;
+      BA[i] = a + (a0 - a) * e;
+
+      var bi = si * NCOL + GCO[i];
+      var L = blen[bi];
+      if (L < N){
+        buckets[bi][L] = i;
+        blen[bi] = L + 1;
+      }
     }
 
-    // 远 → 近
-    list.sort(function(A, B){ return B.z - A.z; });
-
-    for (var k = 0; k < list.length; k++){
-      var d = list[k];
-      if (d.alpha <= 0.012) continue;
-      ox.font = d.size.toFixed(1) + 'px "Songti SC","STSong","Noto Serif CJK SC","SimSun",serif';
-      ox.textAlign = "center";
-      ox.textBaseline = "middle";
-      ox.fillStyle = d.col + d.alpha.toFixed(3) + ")";
-      ox.fillText(d.ch, d.x, d.y);
+    ox.globalAlpha = 1;
+    for (var s = 0; s < NB; s++){
+      var drew = false;
+      for (var c = 0; c < NCOL; c++){
+        var idx = s * NCOL + c;
+        var len = blen[idx];
+        if (!len) continue;
+        if (!drew){ ox.font = FONTS[s]; drew = true; }
+        ox.fillStyle = COLS[c];
+        var arr = buckets[idx];
+        for (var k = 0; k < len; k++){
+          var q = arr[k];
+          var al = BA[q];
+          if (al <= 0.012) continue;
+          ox.globalAlpha = al;
+          ox.fillText(GLYPHS[GCH[q]], BX[q], BY[q]);
+        }
+      }
     }
 
-    // 球心暖光
-    var glow = ox.createRadialGradient(CX, CY, 0, CX, CY, OR * (1.05 + e * 0.35));
-    glow.addColorStop(0, "rgba(228,99,58," + (0.16 * (1 - e * 0.7)).toFixed(3) + ")");
-    glow.addColorStop(0.55, "rgba(206,66,41," + (0.07 * (1 - e)).toFixed(3) + ")");
-    glow.addColorStop(1, "rgba(206,66,41,0)");
-    ox.fillStyle = glow;
-    ox.fillRect(0, 0, w, h);
-
-    requestAnimationFrame(drawOrb);
+    // 球心暖光（预建渐变，只改透明度）
+    ox.globalAlpha = 0.05 + 0.15 * (1 - e * 0.8);
+    ox.fillStyle = glowGrad;
+    var gR = OR * 1.5;
+    ox.fillRect(CX - gR, CY - gR, gR * 2, gR * 2);
+    ox.globalAlpha = 1;
   }
 
   /* ---------- 滚动驱动 ---------- */
 
-  function readScroll(){
-    var rect = stage.getBoundingClientRect();
-    var total = stage.offsetHeight - window.innerHeight;
-    var p = total > 0 ? (-rect.top) / total : 0;
-    p = Math.max(0, Math.min(1, p));
-    scrollP = p;
-    orbWord.parentElement.parentElement.classList.toggle("late", p > 0.46);
+  function measureStage(){
+    stageTop = stage.getBoundingClientRect().top + window.scrollY;
+    stageH = stage.offsetHeight;
+    stageSpan = Math.max(1, stageH - H);
+  }
 
-    // 花瓣在星球/花这一幕减弱一点，避免抢戏
-    var vis = Math.max(0, Math.min(1, (rect.bottom) / window.innerHeight));
-    petalAlpha = 0.35 + 0.65 * vis;
+  function readScroll(){
+    var p = (window.scrollY - stageTop) / stageSpan;
+    p = p < 0 ? 0 : (p > 1 ? 1 : p);
+    scrollP = p;
+    stage.classList.toggle("late", p > 0.46);
+
+    var bottom = stageTop + stageH - window.scrollY;
+    var vis = bottom / H;
+    petalAlpha = 0.35 + 0.65 * (vis < 0 ? 0 : (vis > 1 ? 1 : vis));
   }
 
   /* ---------- 尺寸 ---------- */
@@ -983,13 +1118,14 @@ a:focus-visible, button:focus-visible{
   function onResize(){
     clearTimeout(rt);
     rt = setTimeout(function(){
-      DPR = Math.min(window.devicePixelRatio || 1, 2);
       W = window.innerWidth;
       H = window.innerHeight;
+      DPR = Math.min(window.devicePixelRatio || 1, W < 700 ? 1.5 : 2);
       sizePetals();
       resetPetals();
       sizeOrb();
       buildParticles();
+      measureStage();
       readScroll();
     }, 200);
   }
@@ -997,10 +1133,11 @@ a:focus-visible, button:focus-visible{
   /* ---------- 启动 ---------- */
 
   function boot(){
-    DPR = Math.min(window.devicePixelRatio || 1, 2);
     W = window.innerWidth;
     H = window.innerHeight;
+    DPR = Math.min(window.devicePixelRatio || 1, W < 700 ? 1.5 : 2);
 
+    buildSprites();
     sizePetals();
     resetPetals();
     sizeOrb();
@@ -1009,18 +1146,26 @@ a:focus-visible, button:focus-visible{
     introT0 = performance.now();
     if (REDUCED) introT0 = performance.now() - 2000;
 
+    measureStage();
     window.addEventListener("scroll", readScroll, { passive: true });
     window.addEventListener("resize", onResize);
     readScroll();
+    // 字体/图片加载后布局可能变，再量一次
+    setTimeout(measureStage, 600);
+
+    // 拖动转球
+    oc.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
 
     if (!REDUCED){
       requestAnimationFrame(loopPetals);
-      requestAnimationFrame(drawOrb);
     } else {
-      petals.forEach(function(p){ drawPetal(p, 0); });
-      scrollP = 0;
-      drawOrb(performance.now());
+      petals.forEach(function(pt){ drawPetal(pt, 0); });
     }
+    // 球始终跑循环：拖动要有实时反馈
+    requestAnimationFrame(drawOrb);
   }
 
   if (document.readyState === "loading"){
