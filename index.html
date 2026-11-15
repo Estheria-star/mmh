@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>米文慧</title>
+<title>mmh</title>
 <meta name="description" content="木棉花开的时候，我就想起你。">
 <meta name="theme-color" content="#0E0A10">
-<meta property="og:title" content="米文慧">
+<meta property="og:title" content="mmh">
 <meta property="og:description" content="木棉花开的时候，我就想起你。">
 <meta property="og:type" content="website">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230E0A10'/%3E%3Cg fill='%23CE4229'%3E%3Cellipse cx='32' cy='19' rx='8' ry='13'/%3E%3Cellipse cx='32' cy='19' rx='8' ry='13' transform='rotate(72 32 32)'/%3E%3Cellipse cx='32' cy='19' rx='8' ry='13' transform='rotate(144 32 32)'/%3E%3Cellipse cx='32' cy='19' rx='8' ry='13' transform='rotate(216 32 32)'/%3E%3Cellipse cx='32' cy='19' rx='8' ry='13' transform='rotate(288 32 32)'/%3E%3C/g%3E%3Ccircle cx='32' cy='32' r='4' fill='%23C9A26B'/%3E%3C/svg%3E">
@@ -86,6 +86,17 @@ main{ position:relative; z-index:3; }
 
 body.locked{ overflow:hidden; height:100vh; }
 
+/* 只有屏幕阅读器看得到的标题 */
+.sr-only{
+  position:absolute;
+  width:1px; height:1px;
+  padding:0; margin:-1px;
+  overflow:hidden;
+  clip:rect(0,0,0,0);
+  white-space:nowrap;
+  border:0;
+}
+
 /* ---------- 通用幕 ---------- */
 
 .act{
@@ -163,11 +174,12 @@ body.locked{ overflow:hidden; height:100vh; }
 
 /* 球心：她的名字 */
 .word-her{
-  font-size:clamp(2.1rem, 7.2vw, 4.6rem);
-  font-weight:600;
+  font-family:var(--latin);
+  font-size:clamp(2.6rem, 8vw, 5rem);
+  font-weight:500;
   margin:0;
-  letter-spacing:.3em;
-  text-indent:.3em;
+  letter-spacing:.1em;
+  text-indent:.1em;
   color:#FFF7EC;
   text-shadow:
     0 0 26px rgba(255,247,236,.72),
@@ -492,10 +504,11 @@ body.locked{ overflow:hidden; height:100vh; }
 .act--end.in .sign .seal{ opacity:.95; transform:scale(1) rotate(0deg); animation:sealBreathe 7s ease-in-out 1.2s infinite; }
 
 .sign .herName{
-  font-size:clamp(1.5rem, 4vw, 2.5rem);
-  font-weight:600;
-  letter-spacing:.42em;
-  text-indent:.42em;
+  font-family:var(--latin);
+  font-size:clamp(1.9rem, 4.8vw, 3rem);
+  font-weight:500;
+  letter-spacing:.16em;
+  text-indent:.16em;
   margin:0 0 clamp(1.8rem, 5vh, 2.8rem);
   color:var(--silk);
   text-shadow:0 0 38px rgba(206,66,41,.3);
@@ -642,11 +655,13 @@ a:focus-visible, button:focus-visible{
 <main>
 
   <!-- ══════════ 一 · 星球 → 花 ══════════ -->
+  <h1 class="sr-only">mmh</h1>
+
   <section class="stage" id="stage">
     <div class="sticky">
       <canvas id="orb" tabindex="0" role="img" aria-label="一颗由四十二种语言的「我爱你」组成的星球，可以用方向键或手指左右旋转"></canvas>
       <div class="orbWord">
-        <h1 class="word-her">米文慧</h1>
+        
         <p class="word-love">我喜欢你</p>
       </div>
       <div class="stageHint" aria-hidden="true">拖动球，或向下</div>
@@ -751,7 +766,7 @@ a:focus-visible, button:focus-visible{
         <circle cx="200" cy="200" r="15" fill="#3A0C05"/>
       </svg>
 
-      <p class="herName">米文慧</p>
+      <p class="herName">mmh</p>
       <div class="rule" aria-hidden="true"></div>
       <p>木棉花的花语，是珍惜眼前人。</p>
       <p>所以我把它，和这句话，一起交给你。</p>
@@ -788,7 +803,7 @@ a:focus-visible, button:focus-visible{
   </svg>
 </button>
 
-<audio id="bgm" src="bgm.m4a" loop preload="auto"></audio>
+<audio id="bgm" preload="auto"></audio>
 
 <div class="grain" aria-hidden="true"></div>
 <script>
@@ -1068,6 +1083,8 @@ a:focus-visible, button:focus-visible{
   var FX, FY;                           // 花形目标
   var BX, BY, BA;                       // 每帧屏幕坐标与 alpha
   var DLY;                              // 每颗粒子的绽放延迟
+  var herAlpha = 1;                     // 名字的可见度（滚动驱动）
+  var MID_BUCKET = 10;                  // 名字插在第几个字号桶之前（越大遮挡越少）
   var SD = [];                          // 星尘
 
   var bridgeEl = document.getElementById("bridge");
@@ -1298,6 +1315,32 @@ a:focus-visible, button:focus-visible{
     return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
   }
 
+  // 名字画进球体中层，前后都有粒子 —— 这样它才像"在球里面"，
+  // 而不是浮在球前面。MID_BUCKET 决定有多少粒子盖在它之上。
+  function drawName(a){
+    if (a <= 0.012 || !OR) return;
+
+    // 底下垫一层很淡的暗，保证字不会被粒子糊掉
+    var r = OR * 0.66;
+    var g = ox.createRadialGradient(CX, CY, 0, CX, CY, r);
+    g.addColorStop(0,   "rgba(5,3,8," + (0.56 * a).toFixed(3) + ")");
+    g.addColorStop(0.5, "rgba(5,3,8," + (0.32 * a).toFixed(3) + ")");
+    g.addColorStop(1,   "rgba(5,3,8,0)");
+    ox.globalAlpha = 1;
+    ox.fillStyle = g;
+    ox.fillRect(CX - r, CY - r, r * 2, r * 2);
+
+    ox.globalAlpha = a;
+    ox.font = "500 " + (OR * 0.265).toFixed(0) +
+              'px "Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif';
+    ox.fillStyle = "#FFF7EC";
+    ox.shadowColor = "rgba(228,99,58,0.85)";
+    ox.shadowBlur = OR * 0.085;
+    ox.fillText("mmh", CX, CY);
+    ox.shadowBlur = 0;
+    ox.globalAlpha = 1;
+  }
+
   function drawOrb(t){
     if (!orbRunning) return;      // 滚出视口就整条链断掉，不再排帧
     requestAnimationFrame(drawOrb);
@@ -1423,6 +1466,9 @@ a:focus-visible, button:focus-visible{
 
     ox.globalAlpha = 1;
     for (var s = 0; s < NB; s++){
+      // 画到一半时把名字塞进球里：更远的粒子在它后面，更近的粒子盖住它
+      if (s === MID_BUCKET) drawName(herAlpha);
+
       var drew = false;
       for (var c = 0; c < NCOL; c++){
         var idx = s * NCOL + c;
@@ -1440,6 +1486,7 @@ a:focus-visible, button:focus-visible{
         }
       }
     }
+    if (MID_BUCKET >= NB) drawName(herAlpha);
 
     // —— 受光面：光从左上打过来，随自转慢慢摆 ——
     var lx = CX + Math.sin(rotY) * OR * 0.40;
@@ -1517,6 +1564,7 @@ a:focus-visible, button:focus-visible{
 
     // 名字 → 这句话：连续交叉，不再一刀切
     var herA = 1 - smooth((p - 0.28) / 0.22);
+    herAlpha = herA;
     var loveA = smooth((p - 0.40) / 0.22);
     stickyEl.style.setProperty("--her-a", herA.toFixed(3));
     stickyEl.style.setProperty("--love-a", loveA.toFixed(3));
@@ -1678,6 +1726,23 @@ a:focus-visible, button:focus-visible{
   var bgmMuted = false;        // 用户主动关掉的，就别再自动响
   bgmBtn.classList.add("hint");   // 还没响过，轻轻呼吸一下
 
+  /* 歌单：每次进来随机一首，播完自动换下一首（不会连着放同一首） */
+  var TRACKS = ["bgm.m4a", "bgm2.m4a", "bgm3.m4a", "bgm4.m4a"];
+  var trackIdx = -1;
+
+  function pickTrack(){
+    var n = TRACKS.length;
+    var i;
+    if (n <= 1){
+      i = 0;
+    } else {
+      do { i = (Math.random() * n) | 0; } while (i === trackIdx);
+    }
+    trackIdx = i;
+    bgm.src = TRACKS[i];
+    try { bgm.load(); } catch (err) {}
+  }
+
   function setBgmState(on){
     bgmOn = on;
     bgmBtn.classList.toggle("on", on);
@@ -1736,6 +1801,21 @@ a:focus-visible, button:focus-visible{
   ["pointerdown", "touchend", "keydown", "click"].forEach(function(ev){
     window.addEventListener(ev, firstGesture, { passive: true });
   });
+
+  // 一首放完，换下一首（随机，不重复上一首）
+  bgm.addEventListener("ended", function(){
+    if (bgmMuted) return;
+    var wasVol = bgm.volume;
+    pickTrack();
+    bgm.volume = wasVol;
+    var pr = bgm.play();
+    if (pr && pr.then){
+      pr.then(function(){ setBgmState(true); }).catch(function(){});
+    }
+  });
+
+  // 进门前先把这一首要用的歌准备好，点「进入」的时候就不用等
+  pickTrack();
 
 
   /* ---------- 进入 ---------- */
