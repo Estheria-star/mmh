@@ -660,10 +660,7 @@ a:focus-visible, button:focus-visible{
   <section class="stage" id="stage">
     <div class="sticky">
       <canvas id="orb" tabindex="0" role="img" aria-label="一颗由四十二种语言的「我爱你」组成的星球，可以用方向键或手指左右旋转"></canvas>
-      <div class="orbWord">
-        
-        <p class="word-love">我喜欢你</p>
-      </div>
+      <p class="sr-only">球心是她的名字，往下滚动，这些字会散开、重新拼成「我喜欢你」。</p>
       <div class="stageHint" aria-hidden="true">拖动球，或向下</div>
     </div>
   </section>
@@ -1265,7 +1262,7 @@ a:focus-visible, button:focus-visible{
       var tt = Math.random() * Math.PI * 2;
       var rr = Math.sqrt(Math.random());
       var rMax = flowerRadius(tt);
-      if (rr > rMax || rr < 0.185) continue;
+      if (rr > rMax || rr < 0.225) continue;
       var edge = 0.66 + 0.34 * Math.pow(rr / rMax, 0.8);
       if (Math.random() > edge) continue;
       FX[got] = Math.cos(tt) * rr * R;
@@ -1309,36 +1306,158 @@ a:focus-visible, button:focus-visible{
         sp: 0.45 + Math.random() * 0.5
       });
     }
+
+    // 文字粒子（依赖 OR 和花半径，所以放在这里建）
+    buildGlyphParticles();
   }
 
   function easeInOut(x){
     return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
   }
 
-  // 名字画进球体中层，前后都有粒子 —— 这样它才像"在球里面"，
-  // 而不是浮在球前面。MID_BUCKET 决定有多少粒子盖在它之上。
-  function drawName(a){
-    if (a <= 0.012 || !OR) return;
+  /* ---------- 文字粒子：mmh → 我喜欢你 ----------
+     先把文字栅格化，采出笔画上的点，再让这些点随滚动重新排列。 */
 
-    // 底下垫一层很淡的暗，保证字不会被粒子糊掉
-    var r = OR * 0.66;
-    var g = ox.createRadialGradient(CX, CY, 0, CX, CY, r);
-    g.addColorStop(0,   "rgba(5,3,8," + (0.56 * a).toFixed(3) + ")");
-    g.addColorStop(0.5, "rgba(5,3,8," + (0.32 * a).toFixed(3) + ")");
-    g.addColorStop(1,   "rgba(5,3,8,0)");
-    ox.globalAlpha = 1;
-    ox.fillStyle = g;
-    ox.fillRect(CX - r, CY - r, r * 2, r * 2);
+  var GN = 0;
+  var GAX, GAY, GBX, GBY, GPH2, GSZ, GCOL, GXX, GYY;
+  var TAU = Math.PI * 2;
 
-    ox.globalAlpha = a;
-    ox.font = "500 " + (OR * 0.265).toFixed(0) +
-              'px "Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif';
-    ox.fillStyle = "#FFF7EC";
-    ox.shadowColor = "rgba(228,99,58,0.85)";
-    ox.shadowBlur = OR * 0.085;
-    ox.fillText("mmh", CX, CY);
-    ox.shadowBlur = 0;
+  function sampleTextPoints(text, fontPx, family, count, jitter){
+    var probe = document.createElement("canvas").getContext("2d");
+    var fontStr = "500 " + fontPx + "px " + family;
+    probe.font = fontStr;
+
+    var tw = Math.ceil(probe.measureText(text).width) + Math.ceil(fontPx * 0.6);
+    var th = Math.ceil(fontPx * 1.6);
+
+    var cv = document.createElement("canvas");
+    cv.width = tw; cv.height = th;
+    var g = cv.getContext("2d");
+    g.font = fontStr;
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillStyle = "#fff";
+    g.fillText(text, tw / 2, th / 2);
+
+    var data = g.getImageData(0, 0, tw, th).data;
+    var xs = [], ys = [];
+    var step = Math.max(1, Math.round(fontPx / 62));
+    var s4 = step * 4;
+    var srow = step * 4 * tw;
+
+    // 只取笔画边缘（邻域有透明的点），再稀疏地补一点内部。
+    // 几百个点就能勾出清楚的字形，而不是糊成一团。
+    for (var y = step; y < th - step; y += step){
+      for (var x = step; x < tw - step; x += step){
+        var i4 = (y * tw + x) * 4 + 3;
+        if (data[i4] < 100) continue;
+
+        var edge =
+          data[i4 - s4] < 60 ||
+          data[i4 + s4] < 60 ||
+          data[i4 - srow] < 60 ||
+          data[i4 + srow] < 60;
+
+        if (edge || Math.random() < 0.14){
+          xs.push(x - tw / 2);
+          ys.push(y - th / 2);
+        }
+      }
+    }
+
+    var n = xs.length;
+    var out = new Float32Array(count * 2);
+    if (!n) return out;
+
+    for (var i = 0; i < count; i++){
+      var k = (Math.random() * n) | 0;
+      out[i * 2]     = xs[k] + (Math.random() - 0.5) * jitter;
+      out[i * 2 + 1] = ys[k] + (Math.random() - 0.5) * jitter;
+    }
+    return out;
+  }
+
+  function buildGlyphParticles(){
+    GN = W < 700 ? 480 : 1500;
+
+    GAX = new Float32Array(GN); GAY = new Float32Array(GN);
+    GBX = new Float32Array(GN); GBY = new Float32Array(GN);
+    GPH2 = new Float32Array(GN);
+    GSZ = new Float32Array(GN);
+    GCOL = new Uint8Array(GN);
+    GXX = new Float32Array(GN); GYY = new Float32Array(GN);
+
+    var LATIN = '"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif';
+    var HAN   = '"Songti SC","STSong","Noto Serif CJK SC","SimSun",serif';
+
+    // mmh：字号跟着球半径走
+    var pxA = OR * 0.33;
+    var a = sampleTextPoints("mmh", 170, LATIN, GN, 2.0);
+    var kA = pxA / 170;
+
+    // 我喜欢你：四个字要刚好落进花心
+    var viewH2 = Math.round(stickyEl.clientHeight) || H;
+    var FR = Math.min(W, viewH2) * (W < 700 ? 0.42 : 0.40);
+    var pxB = Math.min(FR * 0.345, W * 0.2);
+    var b = sampleTextPoints("我喜欢你", 210, HAN, GN, 2.4);
+    var kB = pxB / 210;
+
+    for (var i = 0; i < GN; i++){
+      GAX[i] = a[i * 2]     * kA;
+      GAY[i] = a[i * 2 + 1] * kA;
+      GBX[i] = b[i * 2]     * kB;
+      GBY[i] = b[i * 2 + 1] * kB;
+      GPH2[i] = Math.random() * Math.PI * 2;
+      GSZ[i] = 1.5 + Math.random() * 0.7;
+      GCOL[i] = Math.random() < 0.17 ? 1 : 0;
+    }
+  }
+
+  function drawGlyphs(p){
+    if (!GN || !OR) return;
+
+    var raw = (p - 0.30) / 0.42;
+    raw = raw < 0 ? 0 : (raw > 1 ? 1 : raw);
+    var tg = easeInOut(raw);
+
+    var burst = Math.sin(tg * Math.PI) * 34;
+    var alpha = 0.5 + 0.5 * Math.abs(tg * 2 - 1);   // 飞到一半时淡一点
+    var grow = 1 + tg * 0.4;
+
+    // 位置只算一遍，两层复用
+    for (var i = 0; i < GN; i++){
+      var ax = CX + GAX[i], ay = CY + GAY[i];
+      GXX[i] = ax + (CX + GBX[i] - ax) * tg + Math.cos(GPH2[i]) * burst;
+      GYY[i] = ay + (CY + GBY[i] - ay) * tg + Math.sin(GPH2[i]) * burst;
+    }
+
+    // 外层光晕：大、淡、加法混合，才有"在发光"的感觉
+    // （手机上加法混合太贵，改用普通叠加）
+    if (W >= 700) ox.globalCompositeOperation = "lighter";
+    ox.fillStyle = "rgba(214,84,42,1)";
+    ox.globalAlpha = alpha * 0.24;
+    ox.beginPath();
+    for (var j = 0; j < GN; j++){
+      var r1 = GSZ[j] * grow * 1.55;
+      ox.moveTo(GXX[j] + r1, GYY[j]);
+      ox.arc(GXX[j], GYY[j], r1, 0, TAU);
+    }
+    ox.fill();
+    ox.globalCompositeOperation = "source-over";
+
+    // 内层核心：小、亮、实
+    ox.fillStyle = "rgba(255,218,186,1)";
+    ox.globalAlpha = alpha;
+    ox.beginPath();
+    for (var k = 0; k < GN; k++){
+      var r2 = GSZ[k] * grow * 0.8;
+      ox.moveTo(GXX[k] + r2, GYY[k]);
+      ox.arc(GXX[k], GYY[k], r2, 0, TAU);
+    }
+    ox.fill();
+
     ox.globalAlpha = 1;
+    ox.globalCompositeOperation = "source-over";
   }
 
   function drawOrb(t){
@@ -1467,7 +1586,7 @@ a:focus-visible, button:focus-visible{
     ox.globalAlpha = 1;
     for (var s = 0; s < NB; s++){
       // 画到一半时把名字塞进球里：更远的粒子在它后面，更近的粒子盖住它
-      if (s === MID_BUCKET) drawName(herAlpha);
+      if (s === MID_BUCKET && p < 0.55) drawGlyphs(p);
 
       var drew = false;
       for (var c = 0; c < NCOL; c++){
@@ -1486,7 +1605,19 @@ a:focus-visible, button:focus-visible{
         }
       }
     }
-    if (MID_BUCKET >= NB) drawName(herAlpha);
+    if (p >= 0.55){
+      // 文字浮到花瓣之上时，先垫一层暗，把它和花瓣粒子分开
+      var FR2 = Math.min(W, Math.round(stickyEl.clientHeight) || H) * (W < 700 ? 0.42 : 0.40);
+      var gb = ox.createRadialGradient(CX, CY, 0, CX, CY, FR2 * 0.78);
+      gb.addColorStop(0,    "rgba(6,3,9,0.66)");
+      gb.addColorStop(0.55, "rgba(6,3,9,0.4)");
+      gb.addColorStop(1,    "rgba(6,3,9,0)");
+      ox.globalAlpha = 1;
+      ox.fillStyle = gb;
+      ox.fillRect(CX - FR2 * 0.78, CY - FR2 * 0.78, FR2 * 1.56, FR2 * 1.56);
+
+      drawGlyphs(p);
+    }
 
     // —— 受光面：光从左上打过来，随自转慢慢摆 ——
     var lx = CX + Math.sin(rotY) * OR * 0.40;
@@ -1564,7 +1695,7 @@ a:focus-visible, button:focus-visible{
 
     // 名字 → 这句话：连续交叉，不再一刀切
     var herA = 1 - smooth((p - 0.28) / 0.22);
-    herAlpha = herA;
+
     var loveA = smooth((p - 0.40) / 0.22);
     stickyEl.style.setProperty("--her-a", herA.toFixed(3));
     stickyEl.style.setProperty("--love-a", loveA.toFixed(3));
