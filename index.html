@@ -361,6 +361,30 @@ body.locked{ overflow:hidden; height:100vh; }
 }
 
 /* ============================================================
+   第三幕 · 问句（朋友 → 爱人）
+   ============================================================ */
+
+.act--ask{ height:170vh; padding:0; display:block; overflow:visible; }
+
+.ask-sticky{
+  position:sticky;
+  top:0;
+  height:100vh;
+  height:100svh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+
+#askCanvas{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+}
+
+/* ============================================================
    指针：一朵木棉
    ============================================================ */
 
@@ -674,7 +698,16 @@ a:focus-visible, button:focus-visible{
   </section>
 
 
-  <!-- ══════════ 三 · 万语 ══════════ -->
+  <!-- ══════════ 三 · 问句（朋友 → 爱人） ══════════ -->
+  <section class="act act--ask" id="ask">
+    <div class="ask-sticky">
+      <canvas id="askCanvas" aria-hidden="true"></canvas>
+      <p class="sr-only">学姐学姐，我们能做一辈子的朋友吗？……那，能做一辈子的爱人吗？</p>
+    </div>
+  </section>
+
+
+  <!-- ══════════ 四 · 万语 ══════════ -->
   <section class="act act--voices" id="voices">
     <div class="voicesHead">
       <p>世界上有七千种语言</p>
@@ -1460,6 +1493,262 @@ a:focus-visible, button:focus-visible{
     ox.globalCompositeOperation = "source-over";
   }
 
+
+  /* ══════════════════════════════════════════
+     问句：学姐学姐，我们能做一辈子的朋友吗
+           → 能做一辈子的爱人吗
+     ══════════════════════════════════════════ */
+
+  var ASK_A = ["学姐学姐", "我们能做一辈子的朋友吗"];
+  var ASK_B = ["学姐学姐", "我们能做一辈子的爱人吗"];
+
+  var AN = 0;
+  var AAX, AAY, ABX, ABY, APH, ASZ, AXX, AYY;
+  var askCanvas = document.getElementById("askCanvas");
+  var askStatic = null, askStaticW = 0, askStaticH = 0;
+  var askCtx = askCanvas.getContext("2d");
+  var askEl = document.getElementById("ask");
+  var askTop = 0, askSpan = 1;
+  var askP = 0, askRunning = false, askLast = 0;
+
+  function hash01(i){
+    var x = Math.sin(i * 12.9898 + 4.1414) * 43758.5453;
+    return x - Math.floor(x);
+  }
+
+  // 逐字采样：每个字单独采 perChar 个点。
+  // 这样「朋」和「爱」的第 k 个点天然一一对应，句子前半段的两组点完全重合，
+  // 滚动时只有最后两个字在动，别的一个像素都不挪。
+  function sampleSentence(lines, fontPx, family, perChar){
+    var probe = document.createElement("canvas").getContext("2d");
+    var fontStr = "500 " + fontPx + "px " + family;
+    probe.font = fontStr;
+
+    var maxW = 0;
+    for (var i = 0; i < lines.length; i++){
+      maxW = Math.max(maxW, probe.measureText(lines[i]).width);
+    }
+
+    var lh = fontPx * 1.42;
+    var cw = Math.ceil(maxW + fontPx * 0.8);
+    var ch = Math.ceil(lh * lines.length + fontPx * 0.6);
+
+    var cell = Math.ceil(fontPx * 1.6);
+    var sc = document.createElement("canvas");
+    sc.width = cell; sc.height = cell;
+    var sg = sc.getContext("2d");
+    sg.font = fontStr;
+    sg.textAlign = "center";
+    sg.textBaseline = "middle";
+    sg.fillStyle = "#fff";
+
+    var out = [];
+    var step = Math.max(1, Math.round(fontPx / 54));
+
+    for (var li = 0; li < lines.length; li++){
+      var line = lines[li];
+      var lineW = probe.measureText(line).width;
+      var startX = cw / 2 - lineW / 2;
+      var cy = ch / 2 - (lh * lines.length) / 2 + lh / 2 + lh * li;
+
+      var sumW = 0;
+      for (var ci = 0; ci < line.length; ci++){
+        var glyph = line.charAt(ci);
+        var gw = probe.measureText(glyph).width;
+        var gx = startX + sumW + gw / 2;
+        sumW += gw;
+
+        sg.clearRect(0, 0, cell, cell);
+        sg.fillText(glyph, cell / 2, cell / 2);
+
+        var sd = sg.getImageData(0, 0, cell, cell).data;
+        var px = [], py = [];
+        for (var yy = step; yy < cell - step; yy += step){
+          for (var xx = step; xx < cell - step; xx += step){
+            if (sd[(yy * cell + xx) * 4 + 3] > 100){
+              px.push(xx - cell / 2);
+              py.push(yy - cell / 2);
+            }
+          }
+        }
+
+        var np = px.length;
+        for (var k = 0; k < perChar; k++){
+          if (!np){ out.push(gx - cw / 2, cy - ch / 2); continue; }
+          var idx = Math.floor(k * np / perChar);
+          if (idx >= np) idx = np - 1;
+          out.push(gx - cw / 2 + px[idx], cy - ch / 2 + py[idx]);
+        }
+      }
+    }
+    return { pts: out, w: cw, h: ch, perChar: perChar };
+  }
+
+  // 把一组点按「外光晕 + 内核心」画出来
+  function paintGlyphPoints(g, pts, offset, count, ox0, oy0, sc){
+    if (!count) return;
+
+    if (W >= 700) g.globalCompositeOperation = "lighter";
+    g.fillStyle = "rgba(214,84,42,1)";
+    g.globalAlpha = 0.24;
+    g.beginPath();
+    for (var i = 0; i < count; i++){
+      var k = (offset + i) * 2;
+      var x = ox0 + pts[k] * sc, y = oy0 + pts[k + 1] * sc;
+      var r = (1.3 + hash01((offset + i) * 9.13) * 0.85) * 1.55;
+      g.moveTo(x + r, y);
+      g.arc(x, y, r, 0, TAU);
+    }
+    g.fill();
+    g.globalCompositeOperation = "source-over";
+
+    g.fillStyle = "rgba(255,218,186,1)";
+    g.globalAlpha = 1;
+    g.beginPath();
+    for (var j = 0; j < count; j++){
+      var k2 = (offset + j) * 2;
+      var x2 = ox0 + pts[k2] * sc, y2 = oy0 + pts[k2 + 1] * sc;
+      var r2 = (1.3 + hash01((offset + j) * 9.13) * 0.85) * 0.8;
+      g.moveTo(x2 + r2, y2);
+      g.arc(x2, y2, r2, 0, TAU);
+    }
+    g.fill();
+    g.globalAlpha = 1;
+  }
+
+  function buildAsk(){
+    var box = askCanvas.parentElement.getBoundingClientRect();
+    var cw = Math.round(box.width) || W;
+    var ch = Math.round(box.height) || H;
+
+    askCanvas.width = Math.floor(cw * DPR);
+    askCanvas.height = Math.floor(ch * DPR);
+    askCanvas.style.width = cw + "px";
+    askCanvas.style.height = ch + "px";
+    askCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    var HAN = '"Songti SC","STSong","Noto Serif CJK SC","SimSun",serif';
+
+    var totalChars = 0;
+    for (var L = 0; L < ASK_A.length; L++) totalChars += ASK_A[L].length;
+
+    // 逐字比对，找出真正变化的字 —— 不能硬编码"最后两个字"，
+    // 因为句末还有个「吗」，动它会变成乱码
+    var flatA = ASK_A.join(""), flatB = ASK_B.join("");
+    var diffIdx = [];
+    for (var ci = 0; ci < totalChars; ci++){
+      if (flatA.charAt(ci) !== flatB.charAt(ci)) diffIdx.push(ci);
+    }
+    if (!diffIdx.length) diffIdx = [totalChars - 2, totalChars - 1];
+
+    // 每字点数：密度要跟「我喜欢你」看齐
+    var perChar = W < 700 ? 190 : 340;
+
+    var A = sampleSentence(ASK_A, 200, HAN, perChar);
+    var B = sampleSentence(ASK_B, 200, HAN, perChar);
+
+    var availW = Math.min(cw * 0.88, 1000);
+    var scale = availW / A.w;
+    if (A.h * scale > ch * 0.56) scale = (ch * 0.56) / A.h;
+
+    // —— 不动的字预渲染成一张图，每帧只贴一次 ——
+    askStatic = document.createElement("canvas");
+    askStatic.width = Math.floor(cw * DPR);
+    askStatic.height = Math.floor(ch * DPR);
+    var sg = askStatic.getContext("2d");
+    sg.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    for (var c = 0; c < totalChars; c++){
+      if (diffIdx.indexOf(c) >= 0) continue;
+      paintGlyphPoints(sg, A.pts, c * perChar, perChar, cw / 2, ch / 2, scale);
+    }
+    askStaticW = cw;
+    askStaticH = ch;
+
+    // —— 会动的几个字每帧重画 ——
+    AN = diffIdx.length * perChar;
+    AAX = new Float32Array(AN); AAY = new Float32Array(AN);
+    ABX = new Float32Array(AN); ABY = new Float32Array(AN);
+    APH = new Float32Array(AN); ASZ = new Float32Array(AN);
+    AXX = new Float32Array(AN); AYY = new Float32Array(AN);
+
+    for (var m = 0; m < AN; m++){
+      var srcChar = diffIdx[(m / perChar) | 0];
+      var srcOff = srcChar * perChar + (m % perChar);
+
+      AAX[m] = A.pts[srcOff * 2]     * scale;
+      AAY[m] = A.pts[srcOff * 2 + 1] * scale;
+      ABX[m] = B.pts[srcOff * 2]     * scale;
+      ABY[m] = B.pts[srcOff * 2 + 1] * scale;
+      APH[m] = hash01(m * 3.77) * Math.PI * 2;
+      ASZ[m] = 1.3 + hash01(srcOff * 9.13) * 0.85;
+    }
+  }
+
+  function drawAsk(t){
+    if (!askRunning) return;
+    requestAnimationFrame(drawAsk);
+
+    if (!askLast) askLast = t;
+    askLast = t;
+
+    var w = askCanvas.clientWidth || W;
+    var h = askCanvas.clientHeight || H;
+    var CX2 = w / 2, CY2 = h / 2;
+
+    askCtx.clearRect(0, 0, w, h);
+
+    // 静止的那一句，直接贴图
+    if (askStatic) askCtx.drawImage(askStatic, 0, 0, w, h);
+    if (!AN) return;
+
+    // 前三分之一让人读完，然后才换那两个字
+    var raw = (askP - 0.32) / 0.44;
+    raw = raw < 0 ? 0 : (raw > 1 ? 1 : raw);
+    var e = easeInOut(raw);
+
+    var burst = Math.sin(e * Math.PI) * 17;
+
+    for (var i = 0; i < AN; i++){
+      var dx = ABX[i] - AAX[i];
+      var dy = ABY[i] - AAY[i];
+      AXX[i] = CX2 + AAX[i] + dx * e + Math.cos(APH[i]) * burst;
+      AYY[i] = CY2 + AAY[i] + dy * e + Math.sin(APH[i]) * burst;
+    }
+
+    if (W >= 700) askCtx.globalCompositeOperation = "lighter";
+    askCtx.fillStyle = "rgba(214,84,42,1)";
+    askCtx.globalAlpha = 0.24;
+    askCtx.beginPath();
+    for (var j = 0; j < AN; j++){
+      var r1 = ASZ[j] * 1.55;
+      askCtx.moveTo(AXX[j] + r1, AYY[j]);
+      askCtx.arc(AXX[j], AYY[j], r1, 0, TAU);
+    }
+    askCtx.fill();
+    askCtx.globalCompositeOperation = "source-over";
+
+    askCtx.fillStyle = "rgba(255,218,186,1)";
+    askCtx.globalAlpha = 1;
+    askCtx.beginPath();
+    for (var k = 0; k < AN; k++){
+      var r2 = ASZ[k] * 0.8;
+      askCtx.moveTo(AXX[k] + r2, AYY[k]);
+      askCtx.arc(AXX[k], AYY[k], r2, 0, TAU);
+    }
+    askCtx.fill();
+
+    askCtx.globalAlpha = 1;
+  }
+
+  function startAsk(){
+    if (askRunning) return;
+    askRunning = true;
+    askLast = 0;
+    requestAnimationFrame(drawAsk);
+  }
+  function stopAsk(){ askRunning = false; }
+
   function drawOrb(t){
     if (!orbRunning) return;      // 滚出视口就整条链断掉，不再排帧
     requestAnimationFrame(drawOrb);
@@ -1650,6 +1939,10 @@ a:focus-visible, button:focus-visible{
     stageH = stage.offsetHeight;
     stageSpan = Math.max(1, stageH - H);
 
+    if (askEl){
+      askTop = askEl.getBoundingClientRect().top + window.scrollY;
+      askSpan = Math.max(1, askEl.offsetHeight - H);
+    }
     if (bridgeEl){
       bridgeTop = bridgeEl.getBoundingClientRect().top + window.scrollY;
       bridgeH = Math.max(1, bridgeEl.offsetHeight);
@@ -1713,6 +2006,10 @@ a:focus-visible, button:focus-visible{
       stickyEl.style.opacity = exitA.toFixed(3);
     }
 
+    // 问句幕的进度
+    var ap = (sy - askTop) / askSpan;
+    askP = ap < 0 ? 0 : (ap > 1 ? 1 : ap);
+
     updateBridge(sy);
     updateVoices(sy);
   }
@@ -1741,6 +2038,7 @@ a:focus-visible, button:focus-visible{
       resetPetals();
       sizeOrb();
       buildParticles();
+      buildAsk();
       measureStage();
       readScroll();
     }, 200);
@@ -1758,6 +2056,7 @@ a:focus-visible, button:focus-visible{
     resetPetals();
     sizeOrb();
     buildParticles();
+    buildAsk();
 
     introT0 = performance.now();
     if (REDUCED) introT0 = performance.now() - 2000;
@@ -1797,6 +2096,13 @@ a:focus-visible, button:focus-visible{
           if (e.isIntersecting) startOrb(); else stopOrb();
         });
       }, { threshold: 0 }).observe(stage);
+
+      // 问句幕同理
+      new IntersectionObserver(function(es){
+        es.forEach(function(e){
+          if (e.isIntersecting) startAsk(); else stopAsk();
+        });
+      }, { threshold: 0 }).observe(askEl);
     }
     // 不在这里起球：等观众点了「进入」
   }
